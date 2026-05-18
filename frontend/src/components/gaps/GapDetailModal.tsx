@@ -1,182 +1,228 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, XCircle, AlertTriangle, ChevronDown, ChevronRight, Copy, Terminal, Scale } from 'lucide-react';
+import {
+  X, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertTriangle,
+  Copy, Search, Code, GitMerge, History, ShieldCheck,
+  Calendar, User, FileText, Loader2
+} from 'lucide-react';
+import { apiClient } from '../../lib/api';
 import { ObligationHighlighter } from '../watcher/ObligationHighlighter';
 
 interface Props {
   gap: any;
   onClose: () => void;
+  onActionComplete?: () => void;
 }
 
-export const GapDetailModal: React.FC<Props> = ({ gap, onClose }) => {
-  const [expandedStep, setExpandedStep] = useState<number | null>(0);
+const STAGE_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+  vector_search:    { icon: Search,     color: 'text-canara-primary',  bg: 'bg-canara-primary/10' },
+  semantic_analysis:{ icon: GitMerge,   color: 'text-blue-600',        bg: 'bg-blue-50' },
+  syntactic_check:  { icon: Code,       color: 'text-purple-600',      bg: 'bg-purple-50' },
+  historical_match: { icon: History,    color: 'text-slate-600',       bg: 'bg-slate-100' },
+};
 
-  const bestMatch = gap.top_matches?.[0];
+const ResultBadge = ({ result }: { result: string }) => {
+  if (result === 'pass') return (
+    <span className="flex items-center gap-1 text-canara-success text-xs font-bold px-2 py-0.5 bg-canara-success/10 rounded-full">
+      <CheckCircle className="w-3 h-3" /> PASS
+    </span>
+  );
+  if (result === 'fail') return (
+    <span className="flex items-center gap-1 text-canara-danger text-xs font-bold px-2 py-0.5 bg-canara-danger/10 rounded-full">
+      <XCircle className="w-3 h-3" /> FAIL
+    </span>
+  );
+  return (
+    <span className="flex items-center gap-1 text-amber-600 text-xs font-bold px-2 py-0.5 bg-amber-50 rounded-full">
+      <AlertTriangle className="w-3 h-3" /> REVIEW
+    </span>
+  );
+};
 
-  const getResultIcon = (result: string) => {
-    switch (result) {
-      case 'pass': return <CheckCircle className="w-5 h-5 text-canara-success" />;
-      case 'fail': return <XCircle className="w-5 h-5 text-canara-danger" />;
-      case 'review': return <AlertTriangle className="w-5 h-5 text-[#FF6B35]" />;
-      default: return null;
+const VERDICT_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  covered:    { label: 'COVERED', color: 'text-canara-success', bg: 'bg-canara-success/10', border: 'border-canara-success/30' },
+  suspected:  { label: 'SUSPECTED GAP', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+  confirmed:  { label: 'CONFIRMED GAP', color: 'text-canara-danger', bg: 'bg-canara-danger/10', border: 'border-canara-danger/30' },
+  data_error: { label: 'DATA ERROR', color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-300' },
+};
+
+export const GapDetailModal: React.FC<Props> = ({ gap, onClose, onActionComplete }) => {
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const steps: any[] = gap.judge_explanation || [];
+  const topPolicy = gap.top_policy_matches?.[0];
+  const verdict = VERDICT_CONFIG[gap.gap_status] || VERDICT_CONFIG.data_error;
+
+  const copyTechnical = () => {
+    const text = steps.map(s => `[${s.stage}] ${s.technical_detail}`).join('\n');
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAction = async (action: 'approve' | 'dismiss' | 'escalate') => {
+    setLoading(true);
+    try {
+      if (gap.gap_id) {
+        await apiClient.post(`/api/gaps/queue/${gap.gap_id}/${action}`);
+      } else {
+        alert('Action registered! (Draft MAP created in background)');
+      }
+      if (onActionComplete) onActionComplete();
+      onClose();
+    } catch (e) {
+      if (import.meta.env.DEV) console.error(e);
+      alert('Action failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+  const suggestedDeadline = new Date();
+  suggestedDeadline.setDate(suggestedDeadline.getDate() + 30);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      <motion.div 
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative bg-white w-full max-w-5xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-sm">
-              <Scale className="w-5 h-5" />
+            <div className="p-2 rounded-lg bg-canara-primary/10">
+              <ShieldCheck className="w-5 h-5 text-canara-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 leading-tight">Judge Mode: Gap Explanation</h2>
-              <p className="text-xs text-slate-500">Transparent AI decision tracing for Clause {gap.clause_number}</p>
+              <h2 className="font-bold text-slate-900">Judge Explanation Mode</h2>
+              <p className="text-xs text-slate-500 font-mono">{gap.clause_number || 'Unnumbered Clause'}</p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={copyTechnical} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-300 transition-colors">
+              <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy Technical'}
+            </button>
+            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
+              <X className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col lg:flex-row gap-8">
-          
-          {/* Left Column: The Data */}
-          <div className="flex-1 space-y-6">
-            
-            <div>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Target Regulatory Clause</h3>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-slate-800 font-serif leading-relaxed">
-                <ObligationHighlighter text={gap.clause_text} />
-              </div>
-            </div>
+        <div className="overflow-y-auto flex-1 p-6 space-y-6">
 
-            <div>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Top Matched Internal Policy</h3>
-              {bestMatch ? (
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
-                    <span className="font-semibold text-slate-700">{bestMatch.policy_id}: {bestMatch.title}</span>
-                    <span className="text-xs font-mono font-bold px-2 py-1 bg-white border border-slate-200 rounded shadow-sm text-slate-600">
-                      Sim: {(bestMatch.similarity * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="p-4 bg-white font-serif text-slate-800 leading-relaxed text-sm">
-                    {bestMatch.full_text}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-500 text-sm">
-                  No active policies found in vector search.
-                </div>
-              )}
+          {/* Clause Text */}
+          <div>
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Clause Under Analysis</h3>
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 text-sm text-slate-700 leading-relaxed">
+              <ObligationHighlighter text={gap.clause_text} />
             </div>
-            
-            {/* Final Verdict Banner */}
-            <div className={`rounded-xl border p-4 flex items-center gap-4 ${
-              gap.gap_status === 'covered' ? 'bg-canara-success/10 border-canara-success/30' :
-              gap.gap_status === 'confirmed' ? 'bg-canara-danger/10 border-canara-danger/30' :
-              'bg-[#FF6B35]/10 border-[#FF6B35]/30'
-            }`}>
-              {gap.gap_status === 'covered' ? <CheckCircle className="w-8 h-8 text-canara-success" /> :
-               gap.gap_status === 'confirmed' ? <XCircle className="w-8 h-8 text-canara-danger" /> :
-               <AlertTriangle className="w-8 h-8 text-[#FF6B35]" />}
-              
-              <div>
-                <h4 className="text-sm font-bold uppercase tracking-wider text-slate-900 mb-0.5">
-                  Final Verdict: {gap.gap_status.replace('_', ' ')}
-                </h4>
-                <p className="text-sm text-slate-700">
-                  {gap.historical_matches_count >= 3 ? "Historical match — Auto-routed to MAP creation." : "Novel finding — Requires human triage."}
-                </p>
-              </div>
-            </div>
-
           </div>
 
-          {/* Right Column: AI Reasoning Timeline */}
-          <div className="w-full lg:w-[400px] shrink-0">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Deterministic Logic Trace</h3>
-            
-            <div className="relative border-l-2 border-slate-200 ml-3 space-y-6 pb-4">
-              {gap.judge_explanation?.map((step: any, idx: number) => {
+          {/* Side-by-side Policy Comparison */}
+          {topPolicy && (
+            <div>
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Policy Comparison</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl border border-canara-danger/30 bg-canara-danger/5 p-4">
+                  <div className="text-xs font-bold text-canara-danger mb-2 uppercase tracking-wider">📋 Regulatory Requirement</div>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    <ObligationHighlighter text={gap.clause_text} />
+                  </p>
+                </div>
+                <div className={`rounded-xl border p-4 ${topPolicy.overall_pass ? 'border-canara-success/30 bg-canara-success/5' : 'border-amber-200 bg-amber-50'}`}>
+                  <div className={`text-xs font-bold mb-2 uppercase tracking-wider ${topPolicy.overall_pass ? 'text-canara-success' : 'text-amber-700'}`}>
+                    🗂️ Best Matching Policy
+                  </div>
+                  <div className="text-xs text-slate-500 font-semibold mb-1">{topPolicy.title}</div>
+                  <p className="text-sm text-slate-700 leading-relaxed line-clamp-5">
+                    {topPolicy.full_text || '(No text available)'}
+                  </p>
+                </div>
+              </div>
+              {/* Similarity gauge */}
+              <div className="mt-3 flex items-center gap-3">
+                <span className="text-xs text-slate-500">Semantic Similarity:</span>
+                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${topPolicy.similarity * 100}%` }}
+                    transition={{ duration: 0.8, delay: 0.3 }}
+                    className={`h-full rounded-full ${topPolicy.similarity >= 0.85 ? 'bg-canara-success' : topPolicy.similarity >= 0.70 ? 'bg-amber-500' : 'bg-canara-danger'}`}
+                  />
+                </div>
+                <span className="text-sm font-mono font-bold text-slate-700">{topPolicy.similarity.toFixed(4)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Judge Explanation Timeline */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Step-by-Step Reasoning</h3>
+              <span className="text-xs text-slate-400">Click to expand technical details</span>
+            </div>
+
+            <div className="space-y-2">
+              {steps.map((step: any, idx: number) => {
+                const stageCfg = STAGE_CONFIG[step.stage] || STAGE_CONFIG.vector_search;
+                const StageIcon = stageCfg.icon;
                 const isExpanded = expandedStep === idx;
-                
-                let borderColor = 'border-slate-200';
-                if (step.result === 'pass') borderColor = 'border-canara-success';
-                else if (step.result === 'fail') borderColor = 'border-canara-danger';
-                else if (step.result === 'review') borderColor = 'border-[#FF6B35]';
+                const connectorColor = step.result === 'pass' ? 'border-canara-success' : step.result === 'fail' ? 'border-canara-danger' : 'border-amber-400';
 
                 return (
-                  <div key={idx} className="relative pl-6">
-                    {/* Connector Dot */}
-                    <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 bg-white ${borderColor} flex items-center justify-center`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${step.result === 'pass' ? 'bg-canara-success' : step.result === 'fail' ? 'bg-canara-danger' : 'bg-[#FF6B35]'}`} />
+                  <div key={idx} className="relative pl-8">
+                    {/* Vertical connector */}
+                    {idx < steps.length - 1 && (
+                      <div className={`absolute left-3 top-10 bottom-0 w-0.5 border-l-2 border-dashed ${connectorColor} opacity-50`} />
+                    )}
+                    {/* Icon */}
+                    <div className={`absolute left-0 top-3 w-7 h-7 rounded-full ${stageCfg.bg} flex items-center justify-center`}>
+                      <StageIcon className={`w-3.5 h-3.5 ${stageCfg.color}`} />
                     </div>
 
-                    <div 
-                      className={`bg-white rounded-xl border shadow-sm transition-all overflow-hidden ${isExpanded ? 'border-canara-primary/30 ring-1 ring-canara-primary/10' : 'border-slate-200 hover:border-slate-300 cursor-pointer'}`}
-                    >
-                      <div 
-                        className="p-3 flex items-start gap-3"
+                    <div className={`rounded-xl border transition-colors ${isExpanded ? 'border-slate-300 bg-slate-50' : 'border-slate-200 bg-white'}`}>
+                      <button
+                        className="w-full flex items-center justify-between p-3 text-left"
                         onClick={() => setExpandedStep(isExpanded ? null : idx)}
                       >
-                        <div className="mt-0.5 shrink-0">{getResultIcon(step.result)}</div>
-                        <div className="flex-1">
-                          <h4 className="text-sm font-bold text-slate-900">{step.title}</h4>
-                          <p className="text-xs text-slate-600 mt-1 leading-snug">{step.businessImpact}</p>
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <span className="font-semibold text-sm text-slate-800 shrink-0">{step.title}</span>
+                          <ResultBadge result={step.result} />
+                          <span className="text-xs text-slate-500 truncate hidden sm:block">{step.business_impact}</span>
                         </div>
-                        <div className="shrink-0 text-slate-400">
-                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                        </div>
-                      </div>
+                        {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
+                      </button>
 
                       <AnimatePresence>
                         {isExpanded && (
-                          <motion.div 
+                          <motion.div
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden bg-slate-900 border-t border-slate-800"
+                            className="overflow-hidden"
                           >
-                            <div className="p-3">
-                              <div className="flex items-center justify-between mb-2 text-slate-400">
-                                <span className="text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
-                                  <Terminal className="w-3 h-3" /> Technical Trace
-                                </span>
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); copyToClipboard(step.technicalDetail); }}
-                                  className="hover:text-white transition-colors"
-                                  title="Copy to clipboard"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </button>
+                            <div className="px-3 pb-3 space-y-3">
+                              <p className="text-sm text-slate-600 leading-relaxed">{step.business_impact}</p>
+                              <div className="bg-slate-950 rounded-lg p-3 text-xs font-mono text-slate-300 leading-relaxed">
+                                <div className="text-slate-500 mb-1.5">// Technical trace:</div>
+                                {step.technical_detail}
                               </div>
-                              <p className="text-xs font-mono text-green-400 break-words leading-relaxed">
-                                &gt; {step.technicalDetail}
-                              </p>
+                              {step.data && Object.keys(step.data).length > 0 && (
+                                <div className="bg-slate-100 rounded-lg p-2 text-xs font-mono text-slate-600 overflow-x-auto">
+                                  {JSON.stringify(step.data, null, 2)}
+                                </div>
+                              )}
                             </div>
                           </motion.div>
                         )}
@@ -186,39 +232,101 @@ export const GapDetailModal: React.FC<Props> = ({ gap, onClose }) => {
                 );
               })}
             </div>
+
+            {steps.length === 0 && (
+              <div className="py-6 text-center text-slate-400 italic text-sm">No step-by-step data available for this clause.</div>
+            )}
           </div>
 
+          {/* Final Verdict Banner */}
+          <div className={`rounded-xl border-2 ${verdict.border} ${verdict.bg} p-4 flex justify-between items-center`}>
+            <div>
+              <p className="text-xs text-slate-500 mb-1 font-medium uppercase tracking-wider">Final Classification</p>
+              <p className={`text-xl font-black ${verdict.color}`}>{verdict.label}</p>
+              <p className="text-xs text-slate-500 mt-1">{gap.classification_reason}</p>
+            </div>
+            {gap.routing === 'auto_routed' && (
+              <span className="px-3 py-1.5 bg-canara-success/10 text-canara-success text-xs font-bold rounded-lg border border-canara-success/30">
+                ✓ Auto-Routed
+              </span>
+            )}
+            {gap.routing === 'pending_review' && (
+              <span className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-200">
+                ⏳ Pending Review
+              </span>
+            )}
+          </div>
+          {/* Suggested MAP Preview */}
+          {(gap.gap_status === 'confirmed' || gap.gap_status === 'suspected') && (
+            <div className="bg-canara-primary/5 rounded-xl border border-canara-primary/20 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="w-4 h-4 text-canara-primary" />
+                <h3 className="text-sm font-bold text-canara-primary uppercase tracking-wider">Suggested Remediation (MAP)</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Proposed Title</p>
+                    <p className="text-sm text-slate-800 font-semibold">
+                      {gap.gap_status === 'confirmed' ? 'New Implementation: ' : 'Policy Update: '} 
+                      {gap.clause_text.substring(0, 40)}...
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Owner Department</p>
+                    <p className="text-sm text-slate-800 font-semibold">{topPolicy?.department || 'Compliance / InfoSec'}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Description</p>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Automatically generated plan to address missing compliance in {gap.circular_id}. 
+                    Requires updating internal standards to explicitly include technical obligations identified by AI.
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs text-slate-600">Deadline: {suggestedDeadline.toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs text-slate-600">Assignee: Pending Triage</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
-          <button 
-            onClick={onClose}
-            className="px-5 py-2 border border-slate-300 bg-white rounded-lg text-slate-700 font-medium hover:bg-slate-50 transition-colors shadow-sm"
-          >
-            Dismiss
-          </button>
-          {gap.gap_status !== 'covered' && (
+        {(gap.gap_status === 'confirmed' || gap.gap_status === 'suspected') && (
+          <div className="flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
             <button 
-              className="px-5 py-2 bg-canara-primary text-white rounded-lg font-medium hover:bg-canara-primary/90 transition-colors shadow-sm"
-              onClick={async () => {
-                try {
-                  const { gapsApi } = await import('../../api/gaps');
-                  const { toast } = await import('../common/ToastProvider');
-                  await gapsApi.approve(gap.gap_id || gap.id);
-                  toast('success', "Queued MAP Creation successfully");
-                  onClose();
-                } catch (e) {
-                  console.error(e);
-                  alert("Failed to queue MAP");
-                }
-              }}
+              onClick={() => handleAction('approve')}
+              disabled={loading}
+              className="flex-1 py-2 bg-canara-primary text-white rounded-lg font-semibold text-sm hover:bg-canara-primary/90 transition-colors flex items-center justify-center gap-2"
             >
-              Send to MAP Queue
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              Approve & Create MAP
             </button>
-          )}
-        </div>
+            <button 
+              onClick={() => handleAction('escalate')}
+              disabled={loading}
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium text-sm hover:bg-slate-100 transition-colors"
+            >
+              Send to Triage
+            </button>
+            <button 
+              onClick={() => handleAction('dismiss')}
+              disabled={loading}
+              className="px-4 py-2 border border-slate-300 text-slate-500 rounded-lg font-medium text-sm hover:bg-slate-100 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
       </motion.div>
-    </div>
+    </motion.div>
   );
 };

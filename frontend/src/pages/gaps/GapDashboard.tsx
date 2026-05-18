@@ -1,233 +1,338 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, PlayCircle, Loader2, CheckCircle, AlertTriangle, ChevronRight, CheckSquare, XCircle, BrainCircuit } from 'lucide-react';
-import { gapsApi } from '../../api/gaps';
-import { circularsApi } from '../../api/circulars';
+import {
+  Play, CheckCircle, AlertTriangle, XCircle, Database,
+  ChevronDown, Eye, Plus, 
+  Clock, BarChart3, Radar, Loader2
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../../lib/api';
 import { GapDetailModal } from '../../components/gaps/GapDetailModal';
 
+const DETECTION_STAGES = [
+  "Fetching circular clauses...",
+  "Searching vector database...",
+  "Comparing semantic similarity...",
+  "Checking keyword compliance...",
+  "Analyzing historical patterns...",
+  "Classification complete!"
+];
+
+const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
+  covered:    { color: 'text-canara-success', bg: 'bg-canara-success/10', icon: CheckCircle, label: 'Covered' },
+  suspected:  { color: 'text-amber-600', bg: 'bg-amber-50', icon: AlertTriangle, label: 'Suspected Gap' },
+  confirmed:  { color: 'text-canara-danger', bg: 'bg-canara-danger/10', icon: XCircle, label: 'Confirmed Gap' },
+  data_error: { color: 'text-slate-500', bg: 'bg-slate-100', icon: Database, label: 'Data Error' },
+  pending:    { color: 'text-slate-400', bg: 'bg-slate-50', icon: Clock, label: 'Pending' },
+};
+
 export const GapDashboard = () => {
+  const navigate = useNavigate();
   const [circulars, setCirculars] = useState<any[]>([]);
   const [selectedCircular, setSelectedCircular] = useState<string>('');
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [detectionStep, setDetectionStep] = useState(0);
-  const [results, setResults] = useState<any[]>([]);
+  const [detecting, setDetecting] = useState(false);
+  const [detectionStage, setDetectionStage] = useState(0);
+  const [result, setResult] = useState<any>(null);
   const [selectedGap, setSelectedGap] = useState<any>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const stageInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    // Check URL params for pre-selected circular
-    const params = new URLSearchParams(window.location.search);
-    const circularParam = params.get('circular');
-    if (circularParam) {
-      setSelectedCircular(circularParam);
-    }
-
-    circularsApi.list().then(res => {
-      setCirculars(res.circulars.filter((c: any) => 
-        ['fully_parsed', 'processed'].includes(c.ingestion_status)
-      ));
-    });
+    fetchCirculars();
+    return () => { if (stageInterval.current) clearInterval(stageInterval.current); };
   }, []);
+
+  const fetchCirculars = async () => {
+    try {
+      const res = await apiClient.get('/api/gaps/circulars');
+      setCirculars(res.data);
+      if (res.data.length > 0) setSelectedCircular(res.data[0].circular_id);
+    } catch (e) {
+      if (import.meta.env.DEV) console.error(e);
+    }
+  };
 
   const runDetection = async () => {
     if (!selectedCircular) return;
-    
-    setIsDetecting(true);
-    setDetectionStep(1);
-    
-    const timers = [
-      setTimeout(() => setDetectionStep(2), 1000),
-      setTimeout(() => setDetectionStep(3), 2500),
-      setTimeout(() => setDetectionStep(4), 3800),
-    ];
-    
+    setDetecting(true);
+    setResult(null);
+    setDetectionStage(0);
+
+    // Animate through stages
+    let stage = 0;
+    stageInterval.current = setInterval(() => {
+      stage++;
+      if (stage >= DETECTION_STAGES.length - 1) {
+        if (stageInterval.current) clearInterval(stageInterval.current);
+      }
+      setDetectionStage(stage);
+    }, 700);
+
     try {
-      const res = await gapsApi.detect(selectedCircular);
-      timers.forEach(clearTimeout);
-      setDetectionStep(5);
-      setResults(res.gaps_detected);
-    } catch (e) {
-      console.error(e);
-      alert('Gap detection failed');
-      setIsDetecting(false);
+      const res = await apiClient.post(
+        `/api/gaps/detect/${selectedCircular.split('/').map(encodeURIComponent).join('/')}`,
+        null,
+        { timeout: 120_000 }
+      );
+      if (stageInterval.current) clearInterval(stageInterval.current);
+      setDetectionStage(DETECTION_STAGES.length - 1);
+      await new Promise(r => setTimeout(r, 400));
+      setResult(res.data);
+    } catch (e: any) {
+      if (stageInterval.current) clearInterval(stageInterval.current);
+      alert(e?.response?.data?.detail || 'Detection failed');
+    } finally {
+      setDetecting(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'covered': return <span className="px-2 py-1 bg-canara-success/10 text-canara-success rounded text-xs font-bold flex items-center gap-1 w-max"><CheckCircle className="w-3 h-3"/> Covered</span>;
-      case 'suspected': return <span className="px-2 py-1 bg-[#FF6B35]/10 text-[#FF6B35] rounded text-xs font-bold flex items-center gap-1 w-max"><AlertTriangle className="w-3 h-3"/> Suspected</span>;
-      case 'confirmed': return <span className="px-2 py-1 bg-canara-danger/10 text-canara-danger rounded text-xs font-bold flex items-center gap-1 w-max"><ShieldAlert className="w-3 h-3"/> Confirmed</span>;
-      default: return <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-xs font-bold flex items-center gap-1 w-max"><XCircle className="w-3 h-3"/> Unknown</span>;
-    }
-  };
+  const filteredGaps = result?.gaps?.filter((g: any) =>
+    filterStatus === 'all' || g.gap_status === filterStatus
+  ) ?? [];
 
-  const stats = {
-    total: results.length,
-    covered: results.filter(r => r.gap_status === 'covered').length,
-    suspected: results.filter(r => r.gap_status === 'suspected').length,
-    confirmed: results.filter(r => r.gap_status === 'confirmed').length,
-  };
+  const coveragePercent = result ? Math.round(result.coverage_rate * 100) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 pt-20 pb-12 px-6">
       <div className="max-w-7xl mx-auto">
-        
-        {/* Header */}
-        <div className="mb-8 flex items-end justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2 flex items-center gap-3">
-              <BrainCircuit className="w-8 h-8 text-canara-primary" />
-              AI-Powered Gap Detection
-            </h1>
-            <p className="text-slate-600">Cross-reference regulatory obligations with your internal active policies.</p>
-          </div>
-        </div>
 
-        {/* Action Bar */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex-1 w-full max-w-md">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Target Circular</label>
-            <select 
-              className="w-full border-slate-300 rounded-lg focus:ring-canara-primary/50 text-slate-700 bg-slate-50 py-2.5 px-3 border outline-none"
-              value={selectedCircular}
-              onChange={(e) => setSelectedCircular(e.target.value)}
-              disabled={isDetecting}
-            >
-              <option value="">-- Choose a Circular --</option>
-              {circulars.map(c => (
-                <option key={c.circular_id} value={c.circular_id}>{c.circular_id} - {c.title}</option>
-              ))}
-            </select>
+        {/* ── Header ─────────────────────────────────────────── */}
+        <div className="flex justify-between items-end mb-8">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-canara-primary/10 flex items-center justify-center">
+                  <Radar className="w-6 h-6 text-canara-primary" />
+                </div>
+                {detecting && (
+                  <motion.div
+                    className="absolute inset-0 rounded-xl border-2 border-canara-primary"
+                    animate={{ scale: [1, 1.6, 1], opacity: [1, 0, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  />
+                )}
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900">AI-Powered Gap Detection</h1>
+            </div>
+            <p className="text-slate-600">Semantic vector search + deterministic keyword taxonomy for explainable compliance gap analysis.</p>
           </div>
-          
-          <button 
-            onClick={runDetection}
-            disabled={!selectedCircular || isDetecting}
-            className={`px-6 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all ${
-              !selectedCircular ? 'bg-slate-200 text-slate-400 cursor-not-allowed' :
-              isDetecting ? 'bg-canara-primary/80 text-white cursor-wait' :
-              'bg-canara-primary text-white hover:bg-canara-primary/90 shadow-md hover:shadow-lg hover:-translate-y-0.5'
-            }`}
+          <button
+            onClick={() => navigate('/admin/gaps/queue')}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors font-medium shadow-sm"
           >
-            {isDetecting ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> Analyzing...</>
-            ) : (
-              <><PlayCircle className="w-5 h-5" /> Run Gap Detection</>
-            )}
+            <BarChart3 className="w-4 h-4" /> View Triage Queue
           </button>
         </div>
 
-        {/* Processing State */}
-        <AnimatePresence>
-          {isDetecting && detectionStep < 5 && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-slate-900 rounded-xl p-8 mb-8 text-center overflow-hidden border border-slate-700"
-            >
-              <div className="w-16 h-16 relative mx-auto mb-6">
-                <div className="absolute inset-0 border-4 border-canara-primary/30 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-canara-primary border-t-transparent rounded-full animate-spin"></div>
-                <BrainCircuit className="w-6 h-6 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+        {/* ── Run Detection Panel ─────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Select Circular to Analyze</label>
+              <div className="relative">
+                <select
+                  className="w-full appearance-none border border-slate-300 rounded-lg px-4 py-2.5 pr-10 text-slate-800 focus:outline-none focus:ring-2 focus:ring-canara-primary/30"
+                  value={selectedCircular}
+                  onChange={(e) => setSelectedCircular(e.target.value)}
+                  disabled={detecting}
+                >
+                  {circulars.length === 0 && <option value="">No parsed circulars available</option>}
+                  {circulars.map(c => (
+                    <option key={c.circular_id} value={c.circular_id}>
+                      [{c.issuer}] {c.circular_id} — {c.clauses_extracted} clauses
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
-              
-              <h3 className="text-xl font-mono text-white mb-6 h-8">
-                {detectionStep === 1 && "Initializing Atlas Vector Search..."}
-                {detectionStep === 2 && "Comparing semantic similarity across active policies..."}
-                {detectionStep === 3 && "Executing syntactic keyword compliance checks..."}
-                {detectionStep === 4 && "Analyzing historical gap patterns..."}
-              </h3>
+            </div>
+            <motion.button
+              onClick={runDetection}
+              disabled={detecting || !selectedCircular}
+              whileHover={!detecting ? { scale: 1.02 } : {}}
+              whileTap={!detecting ? { scale: 0.98 } : {}}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-white transition-colors shadow-md ${
+                detecting ? 'bg-canara-primary/60 cursor-not-allowed' : 'bg-canara-primary hover:bg-canara-primary/90'
+              }`}
+            >
+              {detecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+              {detecting ? DETECTION_STAGES[detectionStage] : 'Run Gap Detection'}
+            </motion.button>
+          </div>
 
-              <div className="w-full max-w-lg mx-auto bg-slate-800 h-2 rounded-full overflow-hidden">
-                <motion.div 
-                  className="h-full bg-canara-primary"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(detectionStep / 4) * 100}%` }}
-                />
+          {/* Detection Progress Bar */}
+          <AnimatePresence>
+            {detecting && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-5 overflow-hidden">
+                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                  <span className="font-mono text-canara-primary">{DETECTION_STAGES[detectionStage]}</span>
+                  <span>{Math.round((detectionStage / (DETECTION_STAGES.length - 1)) * 100)}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-canara-primary rounded-full"
+                    animate={{ width: `${(detectionStage / (DETECTION_STAGES.length - 1)) * 100}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+                <div className="flex gap-2 mt-3">
+                  {DETECTION_STAGES.slice(0, -1).map((_s, i) => (
+                    <div key={i} className={`flex-1 h-0.5 rounded transition-colors ${i <= detectionStage ? 'bg-canara-primary' : 'bg-slate-200'}`} />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* ── Stats Row ───────────────────────────────────────── */}
+        <AnimatePresence>
+          {result && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+              {[
+                { label: 'Clauses Analyzed', value: result.total_clauses_analyzed, color: 'text-slate-900', bg: 'bg-white' },
+                { label: 'Coverage Rate', value: `${coveragePercent}%`, color: 'text-canara-success', bg: 'bg-canara-success/5' },
+                { label: 'Confirmed Gaps', value: result.confirmed, color: 'text-canara-danger', bg: 'bg-canara-danger/5' },
+                { label: 'Suspected Gaps', value: result.suspected, color: 'text-amber-600', bg: 'bg-amber-50' },
+                { label: 'Data Errors', value: result.data_errors, color: 'text-slate-500', bg: 'bg-slate-50' },
+              ].map((stat, i) => (
+                <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+                  className={`${stat.bg} rounded-xl p-4 border border-slate-200 shadow-sm`}>
+                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">{stat.label}</p>
+                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Gap Results Table ───────────────────────────────── */}
+        <AnimatePresence>
+          {result && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              {/* Table Header */}
+              <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+                <h2 className="font-semibold text-slate-900">
+                  Gap Analysis Results
+                  <span className="ml-2 text-sm text-slate-500 font-normal">({result.detection_time_ms}ms)</span>
+                </h2>
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+                    {['all', 'covered', 'suspected', 'confirmed', 'data_error'].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setFilterStatus(s)}
+                        className={`px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors ${filterStatus === s ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        {s.replace('_', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => navigate('/admin/gaps/queue')} className="flex items-center gap-1.5 px-3 py-1.5 bg-canara-primary text-white text-xs font-semibold rounded-lg hover:bg-canara-primary/90">
+                    <BarChart3 className="w-3 h-3" /> View Queue
+                  </button>
+                </div>
+              </div>
+
+              {/* Table Body */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      {['Clause', 'Obligation', 'Severity', 'Status', 'Similarity', 'Action'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredGaps.map((gap: any, i: number) => {
+                      const cfg = STATUS_CONFIG[gap.gap_status] || STATUS_CONFIG.pending;
+                      const Icon = cfg.icon;
+                      return (
+                        <motion.tr
+                          key={i}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                          className={`border-b border-slate-50 hover:bg-slate-50/80 transition-colors ${gap.gap_status === 'confirmed' ? 'bg-red-50/30' : gap.gap_status === 'suspected' ? 'bg-amber-50/30' : ''}`}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="font-mono text-xs text-slate-500 mb-0.5">{gap.clause_number || 'N/A'}</div>
+                            <div className="text-slate-700 max-w-xs truncate" title={gap.clause_text}>{gap.clause_text}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${gap.obligation_type === 'shall' || gap.obligation_type === 'must' ? 'bg-canara-danger/10 text-canara-danger' : 'bg-slate-100 text-slate-600'}`}>
+                              {gap.obligation_type || '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-semibold ${gap.severity === 'critical' ? 'text-canara-danger' : gap.severity === 'high' ? 'text-amber-600' : 'text-slate-500'}`}>
+                              {gap.severity || '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`flex items-center gap-1.5 w-max px-2 py-1 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.color}`}>
+                              <Icon className="w-3 h-3" /> {cfg.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {gap.similarity_score != null ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${gap.similarity_score >= 0.85 ? 'bg-canara-success' : gap.similarity_score >= 0.70 ? 'bg-amber-500' : 'bg-canara-danger'}`}
+                                    style={{ width: `${gap.similarity_score * 100}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-mono text-slate-600">{gap.similarity_score.toFixed(2)}</span>
+                              </div>
+                            ) : <span className="text-slate-400 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setSelectedGap(gap)}
+                                className="px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-md text-xs font-medium hover:bg-slate-200 transition-colors flex items-center gap-1"
+                              >
+                                <Eye className="w-3 h-3" /> Explain
+                              </button>
+                              {(gap.gap_status === 'confirmed' || gap.gap_status === 'suspected') && (
+                                <button className="px-2.5 py-1.5 bg-canara-primary/10 text-canara-primary rounded-md text-xs font-medium hover:bg-canara-primary/20 transition-colors flex items-center gap-1">
+                                  <Plus className="w-3 h-3" /> MAP
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                    {filteredGaps.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
+                          {result ? 'No gaps match this filter.' : 'Run detection to see results.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Results */}
-        {detectionStep === 5 && results.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center">
-                <p className="text-sm text-slate-500 font-medium mb-1">Obligations Analyzed</p>
-                <p className="text-3xl font-bold text-slate-900">{stats.total}</p>
-              </div>
-              <div className="bg-canara-success/5 p-4 rounded-xl border border-canara-success/20 shadow-sm text-center">
-                <p className="text-sm text-canara-success font-medium mb-1">Coverage Rate</p>
-                <p className="text-3xl font-bold text-canara-success">{Math.round((stats.covered / stats.total) * 100)}%</p>
-              </div>
-              <div className="bg-[#FF6B35]/5 p-4 rounded-xl border border-[#FF6B35]/20 shadow-sm text-center">
-                <p className="text-sm text-[#FF6B35] font-medium mb-1">Suspected Gaps</p>
-                <p className="text-3xl font-bold text-[#FF6B35]">{stats.suspected}</p>
-              </div>
-              <div className="bg-canara-danger/5 p-4 rounded-xl border border-canara-danger/20 shadow-sm text-center">
-                <p className="text-sm text-canara-danger font-medium mb-1">Confirmed Gaps</p>
-                <p className="text-3xl font-bold text-canara-danger">{stats.confirmed}</p>
-              </div>
+        {/* Empty State */}
+        {!result && !detecting && (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-24 h-24 rounded-full bg-canara-primary/5 flex items-center justify-center mb-6">
+              <Radar className="w-12 h-12 text-canara-primary/40" />
             </div>
-
-            {/* Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4 font-semibold">Clause ID</th>
-                    <th className="px-6 py-4 font-semibold">Obligation Text</th>
-                    <th className="px-6 py-4 font-semibold">Severity</th>
-                    <th className="px-6 py-4 font-semibold">Status</th>
-                    <th className="px-6 py-4 font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {results.map((r, idx) => {
-                    const bestMatch = r.top_matches[0];
-                    return (
-                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 font-mono font-bold text-slate-700">
-                          {r.clause_number || `CL-${idx+1}`}
-                        </td>
-                        <td className="px-6 py-4 max-w-md">
-                          <p className="truncate text-slate-800">{r.clause_text}</p>
-                          {bestMatch && (
-                            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                              Match: {bestMatch.policy_id} ({(bestMatch.similarity * 100).toFixed(0)}%)
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="uppercase text-[10px] font-bold tracking-wider px-2 py-1 bg-slate-100 rounded text-slate-600">
-                            {r.severity}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(r.gap_status)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <button 
-                            onClick={() => setSelectedGap(r)}
-                            className="text-canara-primary hover:text-canara-primary/80 font-semibold flex items-center gap-1 text-xs bg-canara-primary/10 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            Judge View <ChevronRight className="w-3 h-3" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
+            <h3 className="text-xl font-semibold text-slate-700 mb-2">No Analysis Yet</h3>
+            <p className="text-slate-400 max-w-sm">Select a circular from the dropdown above and click "Run Gap Detection" to begin AI-powered compliance analysis.</p>
+          </div>
         )}
       </div>
 
-      {/* Detail Modal */}
+      {/* Gap Detail Modal */}
       <AnimatePresence>
         {selectedGap && (
           <GapDetailModal gap={selectedGap} onClose={() => setSelectedGap(null)} />

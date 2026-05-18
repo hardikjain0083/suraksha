@@ -1,86 +1,38 @@
 # SuRaksha MAPS v4.0
 
-Complete project scaffold for "SuRaksha MAPS v4.0" with a React 18 + Vite frontend and a FastAPI backend with MongoDB Atlas cloud deployment.
+Welcome to SuRaksha MAPS (Multi-Agent Policy System) v4.0. This project is designed to automate the ingestion, gap detection, and compliance tracking of regulatory circulars (such as those from the RBI) for financial institutions.
 
-## Architecture
+## Project Flow
+The overall flow of the SuRaksha MAPS platform is as follows:
+1. **Authentication & Zero-Trust RBAC**: Users log in and are securely routed to their department-specific dashboards. 
+2. **Regulatory Ingestion (Watcher)**: Compliance Officers upload PDF or TXT circulars. The system automatically parses these documents, extracting text, tables, and specific regulatory clauses.
+3. **Gap Detection**: The parsed clauses are run against the organization's existing internal policies using vector similarity searches and NLP to identify "Covered" areas, "Suspected Gaps," or "Confirmed Gaps".
+4. **Triage & Validation**: Identified gaps are sent to a Triage Queue for human review. Authorized users can approve, dismiss, or escalate these gaps.
+5. **Multi-Agent Path (MAP) Creation**: Approving a gap automatically creates a MAP, routing the task to the relevant department (e.g., IT, Legal, Risk) for remediation.
 
-```text
-+-----------------------+           +------------------------+           +-------------------------+
-|                       |           |                        |           |                         |
-|  Frontend (React)     |   REST    |  Backend (FastAPI)     |   Motor   |  Database (MongoDB)     |
-|  (Vercel)             | --------> |  (Railway/Render)      | --------> |  (Atlas Cluster)        |
-|  Tailwind, shadcn/ui  |           |  JWT, ML embeddings    |           |                         |
-|                       |           |                        |           |                         |
-+-----------------------+           +------------------------+           +-------------------------+
-```
+## Modules Explanation
 
-## Quick Start (Local Development)
+### 1. Frontend (`/frontend`)
+- **Framework**: React + TypeScript + Vite.
+- **Purpose**: Provides the user interface for all roles.
+- **Key Components**:
+  - `AdminDashboard`: Global oversight for CISO and system admins.
+  - `DepartmentDashboard`: Tailored views for specific roles like IT Lead, Legal Head, etc.
+  - `Circulars`: The board where uploaded circulars are tracked.
+  - `GapDetection`: Interface to trigger and review gap analysis.
+  - `Triage Queue`: The sign-off and validation page for potential gaps.
 
-### Prerequisites
-- Node.js (v18+)
-- Python (v3.10+)
-- MongoDB Atlas Cluster
+### 2. Backend (`/backend`)
+- **Framework**: FastAPI (Python) with Pydantic for validation.
+- **Database**: MongoDB Atlas.
+- **Purpose**: Exposes RESTful APIs, handles database interactions, and runs the core business logic.
+- **Key Services**:
+  - `auth`: Handles registration, login, and token generation.
+  - `circulars`: Manages document uploads, GridFS storage, and ingestion triggers.
+  - `gap_detector`: The engine that compares new clauses against existing policies.
+  - `parsers`: Contains logic to extract text from unstructured data.
 
-### 1. Backend Setup
-```bash
-cd backend
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
+### 3. Mock Data & Seeding (`/mock-data`)
+- Contains scripts and JSON data to seed the database with mock policies, users, and gaps for testing purposes.
 
-pip install -r requirements.txt
-```
-Create `.env` file in the `backend` folder using `.env.example` as a reference. Ensure `MONGODB_URI` points to your cluster.
-
-Start the backend:
-```bash
-uvicorn main:app --reload
-```
-
-### 2. Frontend Setup
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## MongoDB Atlas Setup Guide
-
-To run the full hackathon demo features, you need an M10+ cluster on MongoDB Atlas running MongoDB 7.0+.
-
-1. **Create an M10 Cluster**: Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) and create an **M10 (Dedicated/Shared)** cluster. A free tier (M0) cannot run Python-triggered Vector Search Index creations.
-2. **Network Access**: Under Security > Network Access, whitelist `0.0.0.0/0` (Allow Access from Anywhere) for the hackathon. 
-3. **Database Access**: Create a new database user with the `readWrite` role.
-4. **Connection String**: Copy your connection string and add it to `backend/.env`.
-
-### Automated Setup & Seeding
-Once your `.env` is configured, run the setup scripts in this exact order:
-
-```bash
-cd backend
-# 1. Create collections, validators, standard indexes, and request Vector Search indexes
-python setup_atlas.py
-
-# 2. Wait for indexes to build and verify everything is working
-python verify_atlas.py
-
-# 3. Seed the database with mock users, circulars, MAPs, and 384-dim embeddings
-python seed_database.py
-```
-
-## Deployment
-
-### Frontend (Vercel)
-- Push your repository to GitHub.
-- Import the project into Vercel.
-- Set the Root Directory to `frontend`.
-- Add any required environment variables.
-- Vercel will auto-detect Vite and deploy.
-
-### Backend (Railway/Render)
-- Connect your GitHub repository to Railway.
-- Specify the Root Directory as `backend`.
-- Ensure `railway.toml` handles the build and start commands.
-- Add required environment variables including `MONGODB_URI`.
+For setup and deployment, please refer to the specific guides included in this repository.

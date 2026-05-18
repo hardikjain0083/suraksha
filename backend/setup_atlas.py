@@ -8,7 +8,19 @@ from config import settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Flexible Schemas for validation - Let Pydantic handle rich validation
+MAP_STATUS_ENUM = [
+    "draft",
+    "pending_review",
+    "approved",
+    "open",
+    "in_progress",
+    "pending_validation",
+    "complete",
+    "escalated",
+    "rejected",
+    "cancelled",
+]
+
 SCHEMAS = {
     "users": {
         "$jsonSchema": {
@@ -17,9 +29,18 @@ SCHEMAS = {
             "properties": {
                 "emp_id": {"bsonType": "string"},
                 "email": {"bsonType": "string", "pattern": "^.+@.+$"},
-                "role": {"enum": ["admin", "compliance_officer", "department_head", "auditor"]},
-                "status": {"enum": ["active", "inactive", "suspended", "pending", "failed"]}
-            }
+                "role": {
+                    "enum": [
+                        "admin",
+                        "compliance_officer",
+                        "department_head",
+                        "auditor",
+                        "employee",
+                    ]
+                },
+                "status": {"enum": ["active", "inactive", "suspended", "pending", "failed"]},
+                "active_maps_count": {"bsonType": "int"},
+            },
         }
     },
     "circulars": {
@@ -29,10 +50,20 @@ SCHEMAS = {
             "properties": {
                 "circular_id": {"bsonType": "string"},
                 "title": {"bsonType": "string"},
-                "issuer": {"enum": ["RBI", "SEBI", "CERT-In", "Internal", "UNKNOWN"]},
-                "ingestion_status": {"enum": ["pending", "fully_parsed", "partially_parsed", "failed", "pending_review", "processed"]},
-                "date_issued": {"bsonType": "date"}
-            }
+                "issuer": {"enum": ["RBI", "SEBI", "CERT-In", "Internal", "UNKNOWN", "IRDAI"]},
+                "ingestion_status": {
+                    "enum": [
+                        "pending",
+                        "fully_parsed",
+                        "partially_parsed",
+                        "failed",
+                        "pending_review",
+                        "processed",
+                    ]
+                },
+                "full_text_hash": {"bsonType": "string"},
+                "date_issued": {"bsonType": "date"},
+            },
         }
     },
     "policies": {
@@ -40,102 +71,128 @@ SCHEMAS = {
             "bsonType": "object",
             "required": ["policy_id", "title", "department_owner_id", "status", "content"],
             "properties": {
-                "status": {"enum": ["draft", "active", "archived"]}
-            }
+                "status": {"enum": ["draft", "active", "archived"]},
+            },
         }
     },
     "maps": {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["map_id", "circular_id", "policy_id", "status", "owner_department_id"],
+            "required": ["map_id", "circular_id", "status", "owner_department_id"],
             "properties": {
-                "status": {"enum": ["draft", "in_review", "approved", "rejected", "published"]}
-            }
+                "status": {"enum": MAP_STATUS_ENUM},
+                "policy_id": {"bsonType": "string"},
+            },
         }
     },
     "audit_logs": {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["timestamp", "user_id", "action_type"],
+            "required": [
+                "log_id",
+                "timestamp",
+                "user_id",
+                "action_type",
+                "tamper_evident_hash",
+                "previous_log_hash",
+            ],
             "properties": {
+                "log_id": {"bsonType": "string"},
                 "timestamp": {"bsonType": "date"},
-                "action_type": {"bsonType": "string"}
-            }
+                "action_type": {"bsonType": "string"},
+                "tamper_evident_hash": {"bsonType": "string"},
+                "previous_log_hash": {"bsonType": "string"},
+            },
         }
     },
     "gap_queue": {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["circular_id", "triage_status", "classification", "gap_description"],
+            "required": ["circular_id", "triage_status"],
             "properties": {
-                "triage_status": {"enum": ["new", "assigned", "resolved"]},
-                "classification": {"enum": ["critical", "high", "medium", "low"]}
-            }
+                "triage_status": {
+                    "enum": ["new", "assigned", "resolved", "dismissed", "escalated"]
+                },
+                "classification": {"enum": ["critical", "high", "medium", "low"]},
+                "gap_status": {"bsonType": "string"},
+            },
         }
-    }
+    },
+    "tickets": {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["ticket_id", "title", "status", "assignee", "linked_map"],
+            "properties": {
+                "ticket_id": {"bsonType": "string"},
+                "title": {"bsonType": "string"},
+                "status": {"enum": ["open", "in_progress", "closed"]},
+                "assignee": {"bsonType": "string"},
+                "linked_map": {"bsonType": "string"},
+                "created_at": {"bsonType": "date"},
+                "updated_at": {"bsonType": "date"},
+            },
+        }
+    },
 }
 
-COLLECTIONS = ["users", "departments", "circulars", "policies", "maps", "evidence", "audit_logs", "sessions", "gap_queue"]
+COLLECTIONS = [
+    "users",
+    "departments",
+    "circulars",
+    "policies",
+    "maps",
+    "evidence",
+    "audit_logs",
+    "sessions",
+    "gap_queue",
+    "tickets",
+    "counters",
+]
+
 
 async def create_collections_with_validators(db):
     for coll_name in COLLECTIONS:
         try:
             validator = SCHEMAS.get(coll_name, {})
             if validator:
-                await db.create_collection(coll_name, validator=validator, validationLevel="moderate")
-                logger.info(f"Created collection '{coll_name}' with flexible schema validator (moderate level).")
+                await db.create_collection(
+                    coll_name, validator=validator, validationLevel="moderate"
+                )
+                logger.info("Created collection '%s' with schema validator.", coll_name)
             else:
                 await db.create_collection(coll_name)
-                logger.info(f"Created collection '{coll_name}' without schema validator.")
+                logger.info("Created collection '%s'.", coll_name)
         except CollectionInvalid:
-            logger.warning(f"Collection '{coll_name}' already exists.")
+            logger.warning("Collection '%s' already exists.", coll_name)
+
 
 async def create_standard_indexes(db):
-    # users
     await db.users.create_index("emp_id", unique=True)
     await db.users.create_index("email", unique=True)
     await db.users.create_index("department_id")
-    # circulars
+    await db.users.create_index("active_maps_count")
+
     await db.circulars.create_index("circular_id", unique=True)
+    await db.circulars.create_index("full_text_hash", unique=True, sparse=True)
     await db.circulars.create_index("issuer")
     await db.circulars.create_index("ingestion_status")
-    await db.circulars.create_index("date_issued")
-    # maps
+
     await db.maps.create_index("map_id", unique=True)
     await db.maps.create_index("status")
-    await db.maps.create_index("owner_department_id")
     await db.maps.create_index("assigned_to")
-    await db.maps.create_index("deadline")
-    # policies
+
     await db.policies.create_index("policy_id", unique=True)
-    await db.policies.create_index("department_owner_id")
-    await db.policies.create_index("status")
-    # audit_logs
     await db.audit_logs.create_index([("timestamp", -1)])
-    await db.audit_logs.create_index("user_id")
-    await db.audit_logs.create_index("action_type")
-    await db.audit_logs.create_index("map_id")
-    # gap_queue
+    await db.audit_logs.create_index("log_id", unique=True)
     await db.gap_queue.create_index("triage_status")
-    await db.gap_queue.create_index("classification")
-    await db.gap_queue.create_index("circular_id")
+    await db.tickets.create_index("ticket_id", unique=True)
+    await db.evidence.create_index("evidence_id", unique=True)
+
     logger.info("All standard indexes created successfully.")
+
 
 async def create_atlas_search_indexes(db):
     logger.info("Creating Atlas Search & Vector Search Indexes...")
-    
-    # Circulars Search Index
-    circulars_search_def = {
-        "name": "text_search_circulars",
-        "type": "search",
-        "definition": {
-            "mappings": {
-                "dynamic": True
-            }
-        }
-    }
-    
-    # Circulars Vector Index
     circulars_vector_def = {
         "name": "vector_index_regulations",
         "type": "vectorSearch",
@@ -144,12 +201,10 @@ async def create_atlas_search_indexes(db):
                 "type": "vector",
                 "path": "clauses.embedding",
                 "numDimensions": 384,
-                "similarity": "cosine"
+                "similarity": "cosine",
             }]
-        }
+        },
     }
-
-    # Policies Vector Index
     policies_vector_def = {
         "name": "vector_index_policies",
         "type": "vectorSearch",
@@ -158,34 +213,44 @@ async def create_atlas_search_indexes(db):
                 "type": "vector",
                 "path": "embedding",
                 "numDimensions": 384,
-                "similarity": "cosine"
+                "similarity": "cosine",
             }]
-        }
+        },
     }
-
     try:
-        await db.command("createSearchIndexes", "circulars", indexes=[circulars_search_def, circulars_vector_def])
-        logger.info("Atlas Search and Vector Search indexes for 'circulars' requested.")
+        await db.command(
+            "createSearchIndexes",
+            "circulars",
+            indexes=[circulars_vector_def],
+        )
     except Exception as e:
-        logger.error(f"Failed to create circulars search indexes: {e}")
-
+        logger.error("Failed to create circulars vector index: %s", e)
     try:
-        await db.command("createSearchIndexes", "policies", indexes=[policies_vector_def])
-        logger.info("Atlas Vector Search index for 'policies' requested.")
+        await db.command(
+            "createSearchIndexes",
+            "policies",
+            indexes=[policies_vector_def],
+        )
     except Exception as e:
-        logger.error(f"Failed to create policies search indexes: {e}")
+        logger.error("Failed to create policies vector index: %s", e)
+
 
 async def main():
     logger.info("Connecting to MongoDB Atlas...")
-    client = AsyncIOMotorClient(settings.mongodb_uri, serverSelectionTimeoutMS=5000, tlsCAFile=certifi.where())
-    db = client.suraksha_maps
+    client = AsyncIOMotorClient(
+        settings.mongodb_uri,
+        serverSelectionTimeoutMS=5000,
+        tlsCAFile=certifi.where(),
+    )
+    database = client.suraksha_maps
 
-    await create_collections_with_validators(db)
-    await create_standard_indexes(db)
-    await create_atlas_search_indexes(db)
-    
-    logger.info("MongoDB Atlas Setup Complete!")
+    await create_collections_with_validators(database)
+    await create_standard_indexes(database)
+    await create_atlas_search_indexes(database)
+
+    logger.info("MongoDB Atlas setup complete (%d collections).", len(COLLECTIONS))
     client.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

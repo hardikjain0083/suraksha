@@ -23,7 +23,7 @@ export const useBehavioralCapture = () => {
   const lastMouseMoveTime = useRef<number | null>(null);
   const lastMousePos = useRef<{x: number, y: number} | null>(null);
 
-  const captureKeystrokeDown = useCallback((event: KeyboardEvent | React.KeyboardEvent) => {
+  const captureKeystrokeDown = useCallback((_event: KeyboardEvent | React.KeyboardEvent) => {
     const now = Date.now();
     
     setKeystrokeData(prev => {
@@ -46,7 +46,7 @@ export const useBehavioralCapture = () => {
     lastKeyDownTime.current = now;
   }, []);
 
-  const captureKeystrokeUp = useCallback((event: KeyboardEvent | React.KeyboardEvent) => {
+  const captureKeystrokeUp = useCallback((_event: KeyboardEvent | React.KeyboardEvent) => {
     const now = Date.now();
     
     if (lastKeyDownTime.current !== null) {
@@ -95,7 +95,7 @@ export const useBehavioralCapture = () => {
     lastMouseMoveTime.current = now;
   }, []);
 
-  const captureClick = useCallback((event: MouseEvent | React.MouseEvent) => {
+  const captureClick = useCallback((_event: MouseEvent | React.MouseEvent) => {
     setMouseData(prev => ({
       ...prev,
       clickPatterns: [...prev.clickPatterns, Date.now()]

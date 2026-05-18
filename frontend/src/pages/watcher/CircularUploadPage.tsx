@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadZone } from '../../components/watcher/UploadZone';
 import { JudgeModeNarrator } from '../../components/watcher/JudgeModeNarrator';
-import { ShieldAlert, CheckCircle, AlertTriangle, XCircle, FileText, Loader2, ArrowRight } from 'lucide-react';
-import { circularsApi } from '../../api/circulars';
+import { ShieldAlert, CheckCircle, AlertTriangle, XCircle, Loader2, ArrowRight } from 'lucide-react';
+import { apiClient } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 
 const STAGES = [
@@ -16,7 +16,7 @@ const STAGES = [
 
 export const CircularUploadPage = () => {
   const navigate = useNavigate();
-  const [file, setFile] = useState<File | null>(null);
+  const [, setFile] = useState<File | null>(null);
   const [stage, setStage] = useState(0); // 0=idle, 1=upload, 2=extract, 3=parse, 4=analyze, 5=complete
   const [result, setResult] = useState<any>(null);
   const [judgeMode, setJudgeMode] = useState(false);
@@ -33,16 +33,21 @@ export const CircularUploadPage = () => {
     ];
 
     try {
-      const res = await circularsApi.upload(selectedFile);
-      
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const res = await apiClient.post('/api/circulars/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
       timers.forEach(clearTimeout);
-      setStage(5);
-      setResult(res);
-    } catch (error) {
+      setStage(6);
+      setResult(res.data);
+    } catch (error: any) {
       timers.forEach(clearTimeout);
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
       setStage(0);
-      alert('Upload failed');
+      alert(error?.response?.data?.detail || 'Upload failed. Please try again.');
     }
   };
 
@@ -89,7 +94,7 @@ export const CircularUploadPage = () => {
               </div>
             )}
 
-            {stage === 5 && result && (
+            {stage >= 5 && result && (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -130,6 +135,24 @@ export const CircularUploadPage = () => {
                     
                     <div className="text-slate-500">Processing Time:</div>
                     <div className="font-mono text-slate-700">{result.processing_time_ms} ms</div>
+
+                    <div className="text-slate-500">Extraction Quality:</div>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${result.extraction_confidence > 0.8 ? 'bg-canara-success' : result.extraction_confidence > 0.6 ? 'bg-amber-400' : 'bg-canara-danger'}`}
+                            style={{ width: `${result.extraction_confidence * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-bold font-mono text-slate-500">
+                          {Math.round((result.extraction_confidence || 0) * 100)}%
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 italic">
+                        Multi-strategy engine (pymupdf + pdfplumber)
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -141,7 +164,7 @@ export const CircularUploadPage = () => {
                     Upload Another
                   </button>
                   <button 
-                    onClick={() => navigate(`/admin/circulars/${encodeURIComponent(result.circular_id)}`)}
+                    onClick={() => navigate(`/admin/circulars/${result.circular_id}`)}
                     className="px-6 py-2 bg-canara-primary text-white rounded-lg hover:bg-canara-primary/90 transition-colors font-medium flex items-center gap-2 shadow-sm"
                   >
                     View Details <ArrowRight className="w-4 h-4" />

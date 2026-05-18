@@ -1,13 +1,13 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import './index.css'
-import { JudgeModeProvider } from './contexts/JudgeModeContext.tsx'
+import App from './App.tsx'
+import { AuthProvider } from './contexts/AuthContext.tsx'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <JudgeModeProvider>
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <AuthProvider>
       <App />
-    </JudgeModeProvider>
-  </React.StrictMode>,
+    </AuthProvider>
+  </StrictMode>,
 )

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/suraksha_maps
+      - JWT_SECRET=dev-secret-change-me
+      - DEMO_MODE=false
+    depends_on:
+      - mongodb
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+volumes:
+  mongo_data:

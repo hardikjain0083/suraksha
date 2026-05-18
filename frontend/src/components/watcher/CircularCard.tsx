@@ -43,7 +43,7 @@ export const CircularCard: React.FC<Props> = ({ circular }) => {
     <motion.div 
       whileHover={{ y: -4, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
       className={`bg-white rounded-xl border ${config.border} p-4 shadow-sm cursor-pointer transition-all`}
-      onClick={() => navigate(`/admin/circulars/${encodeURIComponent(circular.circular_id)}`)}
+      onClick={() => navigate(`/admin/circulars/${circular.circular_id}`)}
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-2">

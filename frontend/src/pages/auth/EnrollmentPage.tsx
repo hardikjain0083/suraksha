@@ -5,7 +5,6 @@ import { useBehavioralCapture } from '../../hooks/useBehavioralCapture';
 import { ConsentModal } from '../../components/auth/ConsentModal';
 import { HardwareTokenFallback } from '../../components/auth/HardwareTokenFallback';
 import { QualityScoreGauge } from '../../components/auth/QualityScoreGauge';
-import { useAuth } from '../../hooks/useAuth';
 
 export const EnrollmentPage = () => {
   const [stage, setStage] = useState<'consent' | 'round1' | 'round2' | 'round3' | 'success' | 'optout'>('consent');
@@ -32,25 +31,17 @@ export const EnrollmentPage = () => {
     }
   }, [stage]);
 
-  const handleTargetClick = async (e: React.MouseEvent, id: number) => {
+  const handleTargetClick = (e: React.MouseEvent, id: number) => {
     captureClick(e);
     if (!clickedTargets.includes(id)) {
-      const newTargets = [...clickedTargets, id];
-      setClickedTargets(newTargets);
-      if (newTargets.length === targets.length) {
-        try {
-          await enrollRound(2, { mouse: mouseData });
-          setTimeout(() => setStage('round3'), 1000);
-        } catch (err) {
-          console.error(err);
-        }
+      setClickedTargets(prev => [...prev, id]);
+      if (clickedTargets.length + 1 === targets.length) {
+        setTimeout(() => setStage('round3'), 1000);
       }
     }
   };
 
-  const { enrollRound } = useAuth();
-
-  const handleTextChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setTypedText(e.target.value);
     
     // Simulate real-time score calculation
@@ -58,36 +49,28 @@ export const EnrollmentPage = () => {
     setQualityScore(Math.min(progress * 1.2, 0.95)); // Max 0.95 in round 1
 
     if (e.target.value.length >= standardText.length || e.target.value === standardText) {
-      try {
-        await enrollRound(1, { keystroke: keystrokeData });
-        setQualityScore(1.0);
-        setTimeout(() => {
-          setStage('round2');
-          setTypedText('');
-          reset();
-        }, 1000);
-      } catch (err) {
-        console.error(err);
-      }
+      console.log("Round 1 Keystroke Payload:", keystrokeData);
+      setQualityScore(1.0);
+      setTimeout(() => {
+        setStage('round2');
+        setTypedText('');
+        reset();
+      }, 1000);
     }
   };
 
-  const handleRound3Change = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleRound3Change = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setTypedText(e.target.value);
     
     if (e.target.value.length >= standardText.length || e.target.value === standardText) {
-      try {
-        const res = await enrollRound(3, { keystroke: keystrokeData });
-        setQualityScore(res.quality_score || 0.98); 
-        setTimeout(() => setStage('success'), 1500);
-      } catch (err) {
-        console.error(err);
-      }
+      console.log("Round 3 Keystroke Payload:", keystrokeData);
+      setQualityScore(0.98); // Perfect consistency mock
+      setTimeout(() => setStage('success'), 1500);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+    <div className="min-h-full bg-background flex flex-col items-center py-8 px-4">
       
       <ConsentModal 
         isOpen={stage === 'consent'} 

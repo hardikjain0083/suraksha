@@ -26,6 +26,7 @@ class CircularResponse(CircularBase):
     parser_version: str = "v1.0"
     pages_processed: int = 1
     processing_time_ms: int = 0
+    extraction_confidence: float = 1.0
     clauses: List[Clause] = []
 
     class Config:

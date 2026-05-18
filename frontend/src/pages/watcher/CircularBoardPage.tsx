@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CircularKanban } from '../../components/watcher/CircularKanban';
 import { Search, Filter, Plus, PieChart, Clock, FileText } from 'lucide-react';
-import { circularsApi } from '../../api/circulars';
+import { apiClient } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 
 export const CircularBoardPage = () => {
@@ -16,11 +16,11 @@ export const CircularBoardPage = () => {
 
   const fetchCirculars = async () => {
     try {
-      const res = await circularsApi.list();
-      setCirculars(res.circulars);
-      setStats(res.stats);
+      const res = await apiClient.get('/api/circulars');
+      setCirculars(res.data.circulars);
+      setStats(res.data.stats);
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
     }
   };
 

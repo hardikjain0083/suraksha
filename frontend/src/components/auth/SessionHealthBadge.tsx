@@ -5,6 +5,11 @@ interface Props {
 }
 
 export const SessionHealthBadge: React.FC<Props> = ({ status }) => {
+  let mappedStatus = status;
+  if (status === 'green' as any) mappedStatus = 'healthy';
+  if (status === 'yellow' as any || status === 'orange' as any) mappedStatus = 'warning';
+  if (status === 'red' as any) mappedStatus = 'critical';
+
   const statusConfig = {
     healthy: { color: 'bg-canara-green', text: 'Secure Session', glow: 'shadow-[0_0_8px_rgba(0,168,107,0.8)]' },
     warning: { color: 'bg-canara-orange', text: 'Elevated Risk', glow: 'shadow-[0_0_8px_rgba(255,107,53,0.8)]' },
@@ -12,7 +17,7 @@ export const SessionHealthBadge: React.FC<Props> = ({ status }) => {
     disconnected: { color: 'bg-gray-400', text: 'Disconnected', glow: '' }
   };
 
-  const config = statusConfig[status];
+  const config = statusConfig[mappedStatus as keyof typeof statusConfig] || statusConfig.disconnected;
 
   return (
     <div className="group relative flex items-center gap-2 cursor-help">
