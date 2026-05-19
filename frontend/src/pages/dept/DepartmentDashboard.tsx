@@ -1,52 +1,141 @@
 import React from 'react';
+import { AlertCircle, CheckCircle2, Clock, Zap } from 'lucide-react';
+import {
+  DashboardLayout,
+  DashboardHeader,
+  MetricGrid,
+  StatCard,
+  Panel,
+  Alert,
+} from '../../components/ui/cards';
+import { Button, Badge } from '../../components/ui/modern';
 
 export function DepartmentDashboard() {
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Good morning, Emp. You have 3 MAPs requiring attention.</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="w-4 h-4 rounded-full bg-green-500" title="Session Health"></div>
-          <span className="text-sm">IT Department</span>
-          <span className="text-sm font-semibold">Security Admin</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-blue-50 rounded-lg shadow border border-blue-100">
-          <h3 className="text-blue-800 font-semibold">Active MAPs</h3>
-          <p className="text-2xl font-bold text-blue-900">5</p>
-        </div>
-        <div className="p-4 bg-red-50 rounded-lg shadow border border-red-100">
-          <h3 className="text-red-800 font-semibold">Overdue</h3>
-          <p className="text-2xl font-bold text-red-900">1</p>
-        </div>
-        <div className="p-4 bg-yellow-50 rounded-lg shadow border border-yellow-100">
-          <h3 className="text-yellow-800 font-semibold">Pending Validation</h3>
-          <p className="text-2xl font-bold text-yellow-900">2</p>
-        </div>
-        <div className="p-4 bg-green-50 rounded-lg shadow border border-green-100">
-          <h3 className="text-green-800 font-semibold">Completed This Month</h3>
-          <p className="text-2xl font-bold text-green-900">12</p>
+    <DashboardLayout>
+      <div className="flex items-center justify-between mb-6">
+        <DashboardHeader
+          title="Department Portal"
+          subtitle="You have 3 MAPs requiring immediate attention"
+        />
+        <div className="flex items-center gap-4 glass rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-xs text-muted-foreground">IT Department</span>
+          </div>
+          <div className="w-px h-6 bg-cyber-cyan/20" />
+          <Badge variant="primary" className="text-xs">
+            Security Admin
+          </Badge>
         </div>
       </div>
 
+      {/* Key Metrics */}
+      <MetricGrid cols={4}>
+        <StatCard
+          label="Active MAPs"
+          value="5"
+          icon={<CheckCircle2 size={24} />}
+          accentColor="blue"
+          trend={{ value: 20, isPositive: true }}
+        />
+        <StatCard
+          label="Overdue"
+          value="1"
+          icon={<AlertCircle size={24} />}
+          accentColor="red"
+          trend={{ value: 2, isPositive: false }}
+        />
+        <StatCard
+          label="Pending Validation"
+          value="2"
+          icon={<Clock size={24} />}
+          accentColor="magenta"
+          trend={{ value: 1, isPositive: false }}
+        />
+        <StatCard
+          label="Completed This Month"
+          value="12"
+          icon={<Zap size={24} />}
+          accentColor="cyan"
+          trend={{ value: 50, isPositive: true }}
+        />
+      </MetricGrid>
+
+      {/* Urgent Items */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Urgent Items</h2>
-        <div className="p-4 border rounded-lg border-red-300 bg-red-50 space-y-2">
-          <div className="flex justify-between">
-            <span className="font-semibold text-red-900">MAP-2026-013: Update Firewall Config</span>
-            <span className="text-red-700">Overdue by 2 days</span>
-          </div>
-          <div className="flex gap-2 mt-2">
-            <button className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">View MAP</button>
-            <button className="px-3 py-1 bg-white text-red-700 border border-red-300 rounded text-sm hover:bg-red-50">Upload Evidence</button>
-            <button className="px-3 py-1 bg-white text-gray-700 border border-gray-300 rounded text-sm hover:bg-gray-50">Request Extension</button>
-          </div>
+        <div className="flex items-center gap-2 mb-4">
+          <AlertCircle size={20} className="text-red-400" />
+          <h2 className="text-xl font-semibold text-foreground">Urgent Items</h2>
         </div>
+
+        <Alert
+          type="error"
+          title="MAP-2026-013: Update Firewall Config"
+          message="Overdue by 2 days • Priority: Critical"
+          action={
+            <div className="flex gap-2">
+              <Button variant="primary" size="sm">
+                View MAP
+              </Button>
+              <Button variant="secondary" size="sm">
+                Upload Evidence
+              </Button>
+              <Button variant="ghost" size="sm">
+                Request Extension
+              </Button>
+            </div>
+          }
+        />
+
+        <Alert
+          type="warning"
+          title="MAP-2026-009: Security Patch Review"
+          message="Due in 3 days • Priority: High"
+          action={
+            <div className="flex gap-2">
+              <Button variant="primary" size="sm">
+                View MAP
+              </Button>
+              <Button variant="secondary" size="sm">
+                Upload Evidence
+              </Button>
+            </div>
+          }
+        />
       </div>
-    </div>
+
+      {/* Recent Activity */}
+      <Panel title="Recent Activity" subtitle="Last 10 actions on your MAPs">
+        <div className="space-y-3">
+          {[
+            { action: 'Approved', map: 'MAP-2026-007', time: '2 hours ago', user: 'Compliance Officer' },
+            { action: 'Rejected', map: 'MAP-2026-006', time: '5 hours ago', user: 'Reviewer' },
+            { action: 'Submitted', map: 'MAP-2026-005', time: '1 day ago', user: 'You' },
+          ].map((item, idx) => (
+            <div key={idx} className="flex items-center justify-between p-3 glass-dark rounded-lg border border-cyber-cyan/10">
+              <div className="flex items-center gap-3 flex-1">
+                <Badge
+                  variant={
+                    item.action === 'Approved'
+                      ? 'success'
+                      : item.action === 'Rejected'
+                        ? 'error'
+                        : 'info'
+                  }
+                >
+                  {item.action}
+                </Badge>
+                <div>
+                  <p className="text-sm font-medium text-foreground">{item.map}</p>
+                  <p className="text-xs text-muted-foreground">{item.user}</p>
+                </div>
+              </div>
+              <span className="text-xs text-muted-foreground">{item.time}</span>
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </DashboardLayout>
   );
 }

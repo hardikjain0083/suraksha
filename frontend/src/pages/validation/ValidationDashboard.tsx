@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { ValidationBadge } from '../../components/common/ValidationBadge';
+import { GlassCard } from '@/components/ui/glass-card';
+import { Shield, FileCode, CheckCircle, XCircle, AlertTriangle, Eye, Loader2, Cpu, RefreshCw } from 'lucide-react';
 
 const mockQueue = [
   { id: 'ev_101', mapId: 'MAP-2026-042', type: 'PDF Document', fileName: 'vuln-scan-q2-2026.pdf', uploader: 'Emp 045', uploadedAt: '10 mins ago', status: 'pass', confidence: 0.89, details: [{name: 'File Type Check', status: 'pass'}, {name: 'Date Check', status: 'pass'}, {name: 'Keyword Presence', status: 'pass'}] },
@@ -12,129 +14,185 @@ const mockQueue = [
 export function ValidationDashboard() {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [fileFilter, setFileFilter] = useState('All Types');
 
   const filterQueue = () => {
-    if (activeTab === 'all') return mockQueue;
-    if (activeTab === 'manual') return mockQueue.filter(q => q.status === 'manual_review');
-    if (activeTab === 'failed') return mockQueue.filter(q => q.status === 'fail');
-    return mockQueue.filter(q => q.status === 'pass');
+    let items = mockQueue;
+    if (activeTab === 'failed') items = mockQueue.filter(q => q.status === 'fail');
+    else if (activeTab === 'manual') items = mockQueue.filter(q => q.status === 'manual_review');
+    
+    if (fileFilter !== 'All Types') {
+      if (fileFilter === 'JSON Config') {
+        items = items.filter(q => q.type.includes('JSON'));
+      } else if (fileFilter === 'PDF Documents') {
+        items = items.filter(q => q.type.includes('PDF'));
+      }
+    }
+    return items;
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto flex gap-6 h-[calc(100vh-60px)]">
-      {/* LEFT: Queue List */}
-      <div className="w-1/2 flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-          <h1 className="text-xl font-bold">Validation Queue</h1>
-          <select className="border border-gray-300 rounded text-sm px-2 py-1">
-            <option>All Types</option>
-            <option>JSON Config</option>
-            <option>PDF Documents</option>
-          </select>
+    <div className="flex gap-6 h-[calc(100vh-140px)] font-mono text-xs text-slate-300">
+      {/* LEFT: Queue List Console */}
+      <GlassCard className="w-1/2 flex flex-col border-cyber-cyan/15 overflow-hidden">
+        {/* Console Header */}
+        <div className="p-4 border-b border-cyber-cyan/10 bg-obsidian-950/60 flex justify-between items-center shrink-0">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-cyber-cyan animate-pulse" />
+            <h1 className="text-sm font-bold text-cyber-cyan tracking-wider">EVIDENCE INGESTION QUEUE</h1>
+          </div>
+          <div className="relative">
+            <select 
+              value={fileFilter}
+              onChange={(e) => setFileFilter(e.target.value)}
+              className="bg-obsidian-900 border border-cyber-cyan/25 text-slate-300 rounded px-2.5 py-1 text-[10px] focus:outline-none focus:border-cyber-cyan transition-colors appearance-none pr-6"
+            >
+              <option>All Types</option>
+              <option>JSON Config</option>
+              <option>PDF Documents</option>
+            </select>
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">▼</span>
+          </div>
         </div>
         
-        <div className="flex border-b border-gray-200 text-sm">
-          <button className={`flex-1 py-2 font-medium ${activeTab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`} onClick={() => setActiveTab('all')}>All</button>
-          <button className={`flex-1 py-2 font-medium ${activeTab === 'failed' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`} onClick={() => setActiveTab('failed')}>Failed</button>
-          <button className={`flex-1 py-2 font-medium ${activeTab === 'manual' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`} onClick={() => setActiveTab('manual')}>Manual Review</button>
+        {/* Tabs switcher */}
+        <div className="flex border-b border-cyber-cyan/10 bg-obsidian-950/20 text-[10px] font-bold shrink-0">
+          {[
+            { id: 'all', label: 'ALL FILES' },
+            { id: 'failed', label: 'CHECKSUM FAILS' },
+            { id: 'manual', label: 'ANALYST ESCALATIONS' }
+          ].map(tab => (
+            <button 
+              key={tab.id}
+              className={`flex-1 py-3 text-center border-b-2 transition-all ${
+                activeTab === tab.id 
+                  ? 'border-cyber-cyan text-cyber-cyan bg-cyber-cyan/5 shadow-glow-cyan' 
+                  : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5'
+              }`} 
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
+        {/* Scroll List container */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-obsidian-950/30 scrollbar-thin">
           {filterQueue().map(item => (
             <div 
               key={item.id} 
               onClick={() => setSelectedItem(item)}
-              className={`p-3 border rounded shadow-sm cursor-pointer transition-colors ${selectedItem?.id === item.id ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'}`}
+              className={`p-3.5 border rounded-xl cursor-pointer transition-all duration-200 flex flex-col gap-2.5 ${
+                selectedItem?.id === item.id 
+                  ? 'border-cyber-cyan bg-cyber-cyan/5 shadow-glow-cyan' 
+                  : 'border-cyber-cyan/10 bg-obsidian-950/50 hover:border-cyber-cyan/30 hover:bg-cyber-cyan/5/10'
+              }`}
             >
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex justify-between items-start gap-2">
                 <div>
-                   <span className="text-xs font-bold text-gray-500">{item.mapId}</span>
-                   <h3 className="font-medium text-sm text-gray-900 truncate pr-2">{item.fileName}</h3>
+                   <span className="text-[10px] font-bold text-cyber-blue">{item.mapId}</span>
+                   <h3 className="font-sans font-bold text-slate-200 mt-0.5 truncate pr-2" title={item.fileName}>{item.fileName}</h3>
                 </div>
                 <ValidationBadge status={item.status} confidence={item.confidence} reason={item.reason} />
               </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-2">
-                <span>{item.type}</span>
+              <div className="flex justify-between text-[10px] text-slate-500 border-t border-white/5 pt-2">
+                <span>{item.type.toUpperCase()}</span>
                 <span>{item.uploader} • {item.uploadedAt}</span>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </GlassCard>
 
-      {/* RIGHT: Detail View */}
-      <div className="w-1/2 flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm">
+      {/* RIGHT: Detail View Workspace */}
+      <GlassCard className="w-1/2 flex flex-col border-cyber-cyan/15 overflow-hidden">
         {selectedItem ? (
           <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-start mb-4">
+            {/* Header info */}
+            <div className="p-6 border-b border-cyber-cyan/10 bg-obsidian-950/40 shrink-0">
+              <div className="flex justify-between items-start gap-3">
                 <div>
-                  <h2 className="text-2xl font-bold">{selectedItem.fileName}</h2>
-                  <p className="text-gray-500 text-sm">{selectedItem.id} • Attached to {selectedItem.mapId}</p>
+                  <h2 className="text-base font-bold text-slate-200 font-sans tracking-tight leading-tight">{selectedItem.fileName}</h2>
+                  <p className="text-slate-500 text-[10px] mt-1 font-mono">{selectedItem.id} // SECURE LINK TO {selectedItem.mapId}</p>
                 </div>
                 <ValidationBadge status={selectedItem.status} confidence={selectedItem.confidence} />
               </div>
 
-               <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
-                  <div>
-                    <span className="block text-gray-500 text-xs uppercase font-semibold">Evidence Type</span>
-                    <span className="font-medium">{selectedItem.type}</span>
+               <div className="grid grid-cols-2 gap-4 mt-6">
+                  <div className="bg-obsidian-900 border border-cyber-cyan/5 p-2.5 rounded-lg">
+                    <span className="block text-slate-500 text-[9px] font-bold uppercase tracking-wider mb-0.5">Evidence Type</span>
+                    <span className="font-bold text-cyber-cyan">{selectedItem.type}</span>
                   </div>
-                  <div>
-                    <span className="block text-gray-500 text-xs uppercase font-semibold">Uploaded By</span>
-                    <span className="font-medium">{selectedItem.uploader}</span>
+                  <div className="bg-obsidian-900 border border-cyber-cyan/5 p-2.5 rounded-lg">
+                    <span className="block text-slate-500 text-[9px] font-bold uppercase tracking-wider mb-0.5">Uploaded By</span>
+                    <span className="font-bold text-slate-200">{selectedItem.uploader}</span>
                   </div>
                </div>
             </div>
             
-            <div className="flex-1 p-6 overflow-y-auto bg-gray-50">
-               <h3 className="font-bold text-gray-700 mb-4 uppercase text-xs tracking-wider">Validation Checks Breakdown</h3>
+            {/* Checks breakdown list */}
+            <div className="flex-1 p-6 overflow-y-auto bg-obsidian-950/20 space-y-4 scrollbar-thin">
+               <h3 className="font-bold text-slate-400 uppercase text-[10px] tracking-widest border-b border-cyber-cyan/5 pb-2">// AUTOMATED AUDIT CHECK LISTS</h3>
+               
                <div className="space-y-3">
-                 {selectedItem.details.map((detail: any, i: number) => (
-                    <div key={i} className={`p-3 rounded border flex justify-between items-center bg-white ${detail.status === 'pass' ? 'border-green-200' : 'border-red-200'}`}>
-                      <div>
-                        <div className="font-medium text-sm">{detail.name}</div>
-                        {detail.reason && <div className="text-xs text-red-600 mt-0.5">{detail.reason}</div>}
+                 {selectedItem.details.map((detail: any, i: number) => {
+                    const isPass = detail.status === 'pass';
+                    return (
+                      <div 
+                        key={i} 
+                        className={`p-3 rounded-xl border flex justify-between items-center transition-all bg-obsidian-950/80 ${
+                          isPass 
+                            ? 'border-cyber-green/20 hover:border-cyber-green/40 shadow-glow-green/5' 
+                            : 'border-red-500/20 hover:border-red-500/40 shadow-glow-red/5'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-bold text-slate-200">{detail.name.toUpperCase()}</div>
+                          {detail.reason && <div className="text-[10px] text-red-400 mt-1 font-mono">{detail.reason}</div>}
+                        </div>
+                        <div>
+                          {isPass ? (
+                            <span className="text-cyber-green bg-cyber-green/10 px-2.5 py-0.5 rounded text-[9px] font-bold border border-cyber-green/30 shadow-glow-green/10">PASS</span>
+                          ) : (
+                            <span className="text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded text-[9px] font-bold border border-red-500/30 shadow-glow-red/10">FAIL</span>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        {detail.status === 'pass' ? (
-                          <span className="text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-bold border border-green-100">PASS</span>
-                        ) : (
-                          <span className="text-red-600 bg-red-50 px-2 py-1 rounded text-xs font-bold border border-red-100">FAIL</span>
-                        )}
-                      </div>
-                    </div>
-                 ))}
+                    );
+                 })}
                </div>
             </div>
 
-            <div className="p-4 border-t border-gray-200 bg-white">
+            {/* Verification override panel footer */}
+            <div className="p-4 border-t border-cyber-cyan/10 bg-obsidian-950/60 shrink-0">
                <div className="flex gap-3">
                  {selectedItem.status !== 'pass' && (
-                    <button className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition-colors flex justify-center items-center gap-2">
-                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                       Override & Approve
+                    <button className="flex-1 bg-cyber-green hover:bg-cyber-green/90 text-obsidian-950 font-bold py-2 px-3 rounded-lg transition-all flex justify-center items-center gap-1.5 shadow-glow-green">
+                       <CheckCircle className="w-4 h-4 text-obsidian-900" />
+                       OVERRIDE & APPROVE
                     </button>
                  )}
                  {selectedItem.status !== 'fail' && (
-                    <button className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition-colors flex justify-center items-center gap-2">
-                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                       Override & Reject
+                    <button className="flex-1 bg-cyber-magenta hover:bg-cyber-magenta/90 text-obsidian-950 font-bold py-2 px-3 rounded-lg transition-all flex justify-center items-center gap-1.5 shadow-glow-magenta">
+                       <XCircle className="w-4 h-4 text-obsidian-900" />
+                       OVERRIDE & REJECT
                     </button>
                  )}
-                 <button className="flex-1 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded transition-colors">
-                    Request Info
+                 <button className="flex-1 bg-obsidian-900 border border-cyber-cyan/30 text-cyber-cyan hover:bg-cyber-cyan/10 font-bold py-2 px-3 rounded-lg transition-all">
+                    REQUEST RE-UPLOAD
                  </button>
                </div>
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-             <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-             <p className="text-lg">Select evidence from the queue to view details</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-4">
+             <div className="w-16 h-16 rounded-full bg-cyber-cyan/5 border border-cyber-cyan/10 flex items-center justify-center shadow-glow-cyan/5">
+               <Shield className="w-8 h-8 text-cyber-cyan/30 animate-pulse" />
+             </div>
+             <p className="font-bold text-[10px] tracking-widest text-slate-400 uppercase">// REQUEST EVIDENCE RESOLUTION</p>
           </div>
         )}
-      </div>
+      </GlassCard>
     </div>
   );
 }
