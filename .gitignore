@@ -93,8 +93,3 @@ dmypy.json
 
 # Railway
 .railway/
-__pycache__/
-*.pyc
-venv/
-node_modules/
-dist/
