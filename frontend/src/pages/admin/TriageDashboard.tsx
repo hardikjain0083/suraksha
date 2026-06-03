@@ -334,9 +334,9 @@ export const TriageDashboard = () => {
               {(['all', 'approved', 'rejected', 'escalated'] as ProcessedFilter[]).map((f) => (
                 <button
                   key={f}
-                  type="button; cursor-pointer"
+                  type="button"
                   onClick={() => setProcessedFilter(f)}
-                  className={`text-[9px] px-2 py-1 font-mono rounded capitalize border transition-all ${
+                  className={`text-[9px] px-2 py-1 font-mono rounded capitalize border transition-all cursor-pointer ${
                     processedFilter === f 
                       ? 'bg-cyber-cyan text-obsidian-950 font-bold border-cyber-cyan shadow-glow-cyan' 
                       : 'bg-obsidian-950 border-cyber-cyan/15 text-slate-500 hover:text-slate-300'

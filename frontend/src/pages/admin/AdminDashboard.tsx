@@ -224,8 +224,8 @@ export function AdminDashboard() {
                       <stop offset="95%" stopColor="#ff00ff" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} fontClassName="font-mono" />
-                  <YAxis stroke="#94a3b8" fontSize={10} fontClassName="font-mono" />
+                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} className="font-mono" />
+                  <YAxis stroke="#94a3b8" fontSize={10} className="font-mono" />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#0a0e27', borderColor: '#00d9ff', borderRadius: '8px' }}
                     labelStyle={{ color: '#00d9ff', fontFamily: 'monospace', fontSize: '10px' }}

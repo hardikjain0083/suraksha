@@ -329,20 +329,228 @@ async def get_dashboard_stats():
 
 @router.get("/graph-health")
 async def get_graph_health():
+    database = get_db()
+    
+    # 1. Orphaned Clauses Detection
+    # Get all clauses with gaps that have no corresponding policy
+    orphan_clauses_count = 0
+    issues = []
+    suggestions = []
+    
+    circ_cursor = database.circulars.find({})
+    async for circ in circ_cursor:
+        c_id = circ.get("circular_id")
+        title = circ.get("title", c_id)
+        for clause in circ.get("clauses", []):
+            if clause.get("gap_status") in ("confirmed", "suspected"):
+                # Check if there is a MAP linking this gap to a policy
+                c_num = clause.get("clause_number")
+                mapped = await database.maps.find_one({
+                    "circular_id": c_id,
+                    "clause_text": clause.get("text"),
+                    "policy_id": {"$ne": "UNASSIGNED"}
+                })
+                if not mapped:
+                    orphan_clauses_count += 1
+                    issues.append({
+                        "type": "orphan_clause",
+                        "description": f"Clause {c_num} from '{title}' has no covering policy linked."
+                    })
+                    suggestions.append(f"Create a new compliance policy or link an existing one to cover Clause {c_num}")
+
+    # 2. Stale Edges (e.g., MAPs or policies referencing missing departments or circulars)
+    stale_edges_count = 0
+    maps_cursor = database.maps.find({})
+    async for m in maps_cursor:
+        map_id = m.get("map_id")
+        # Check if department exists
+        dept_id = m.get("owner_department_id")
+        dept = await database.departments.find_one({"department_id": dept_id})
+        if not dept:
+            stale_edges_count += 1
+            issues.append({
+                "type": "stale_edge",
+                "description": f"MAP {map_id} links to a non-existent department: {dept_id}"
+            })
+            suggestions.append(f"Re-route MAP {map_id} to a valid active department")
+            
+        # Check if circular exists
+        circ_id = m.get("circular_id")
+        circular = await database.circulars.find_one({"circular_id": circ_id})
+        if not circular:
+            stale_edges_count += 1
+            issues.append({
+                "type": "stale_edge",
+                "description": f"MAP {map_id} links to archived or deleted circular: {circ_id}"
+            })
+            suggestions.append(f"Archive MAP {map_id} as its parent circular has been removed")
+
+    # 3. Embedding Drift Calculation
+    # Compute cosine similarity between policies and their mapped circular clauses
+    import math
+    def get_cosine_similarity(v1, v2):
+        if not v1 or not v2 or len(v1) != len(v2):
+            return 1.0  # Default to no drift if embeddings are missing
+        dot = sum(a * b for a, b in zip(v1, v2))
+        n1 = math.sqrt(sum(a*a for a in v1))
+        n2 = math.sqrt(sum(b*b for b in v2))
+        return dot / (n1 * n2) if n1 > 0 and n2 > 0 else 1.0
+
+    total_similarity = 0.0
+    mapped_count = 0
+    drift_issues = 0
+    
+    # Iterate through MAPs that link policies to circulars
+    linked_maps = database.maps.find({"policy_id": {"$ne": "UNASSIGNED"}})
+    async for m in linked_maps:
+        circ_id = m.get("circular_id")
+        pol_id = m.get("policy_id")
+        
+        policy = await database.policies.find_one({"policy_id": pol_id})
+        circular = await database.circulars.find_one({"circular_id": circ_id})
+        
+        if policy and circular:
+            p_emb = policy.get("embedding")
+            # Find the clause in the circular
+            c_text = m.get("clause_text", "")
+            c_emb = None
+            for c in circular.get("clauses", []):
+                if c.get("text") == c_text:
+                    c_emb = c.get("embedding")
+                    break
+            
+            if p_emb and c_emb:
+                similarity = get_cosine_similarity(p_emb, c_emb)
+                total_similarity += similarity
+                mapped_count += 1
+                
+                # Heuristic: similarity < 0.70 represents significant semantic drift
+                if similarity < 0.70:
+                    drift_issues += 1
+                    issues.append({
+                        "type": "embedding_drift",
+                        "description": f"Policy '{policy.get('title')}' shows low alignment ({similarity:.2f}) with Clause text."
+                    })
+                    suggestions.append(f"Revise Policy '{policy.get('title')}' to re-align with regulatory updates.")
+
+    avg_similarity = (total_similarity / mapped_count) if mapped_count > 0 else 0.85
+    connectivity_score = int(avg_similarity * 100)
+    
+    # Calculate coverage rate
+    total_clauses = 0
+    covered_clauses = 0
+    async for circ in database.circulars.find({}):
+        for c in circ.get("clauses", []):
+            total_clauses += 1
+            if c.get("gap_status") == "covered":
+                covered_clauses += 1
+                
+    policy_coverage_rate = int((covered_clauses / total_clauses * 100)) if total_clauses > 0 else 85
+    health_score = max(30, 100 - (orphan_clauses_count * 3) - (stale_edges_count * 4) - (drift_issues * 5))
+
+    # 4. Construct Nodes and Links for Graph Visualization
+    nodes = []
+    links = []
+    added_nodes = set()
+    
+    # Fetch all departments
+    dept_cursor = database.departments.find({})
+    async for dept in dept_cursor:
+        d_id = dept.get("department_id")
+        if d_id not in added_nodes:
+            nodes.append({"id": d_id, "label": dept.get("name", d_id), "group": "department"})
+            added_nodes.add(d_id)
+            
+    # Fetch circulars & clauses
+    circ_cursor = database.circulars.find({})
+    async for circ in circ_cursor:
+        c_id = circ.get("circular_id")
+        if c_id not in added_nodes:
+            nodes.append({"id": c_id, "label": circ.get("title", c_id)[:30], "group": "circular"})
+            added_nodes.add(c_id)
+            
+        for clause in circ.get("clauses", []):
+            cl_num = clause.get("clause_number") or "01"
+            cl_id = f"{c_id}_{cl_num}"
+            if cl_id not in added_nodes:
+                nodes.append({"id": cl_id, "label": f"Clause {cl_num}", "group": "clause"})
+                added_nodes.add(cl_id)
+            links.append({"source": c_id, "target": cl_id, "type": "contains"})
+
+    # Fetch policies
+    policy_cursor = database.policies.find({})
+    async for policy in policy_cursor:
+        pol_id = policy.get("policy_id")
+        if pol_id not in added_nodes:
+            nodes.append({"id": pol_id, "label": policy.get("title", pol_id)[:30], "group": "policy"})
+            added_nodes.add(pol_id)
+        dept_owner = policy.get("department_owner_id")
+        if dept_owner:
+            links.append({"source": pol_id, "target": dept_owner, "type": "owned_by"})
+
+    # Fetch MAPs
+    maps_cursor = database.maps.find({})
+    async for m in maps_cursor:
+        map_id = m.get("map_id")
+        if map_id not in added_nodes:
+            nodes.append({"id": map_id, "label": m.get("title", map_id)[:30], "group": "map"})
+            added_nodes.add(map_id)
+            
+        circ_id = m.get("circular_id")
+        cl_num = None
+        if circ_id:
+            circular = await database.circulars.find_one({"circular_id": circ_id})
+            if circular:
+                for c in circular.get("clauses", []):
+                    if c.get("text") == m.get("clause_text"):
+                        cl_num = c.get("clause_number") or "01"
+                        break
+        
+        if circ_id and cl_num:
+            cl_id = f"{circ_id}_{cl_num}"
+            links.append({"source": cl_id, "target": map_id, "type": "mapped_to"})
+            
+        pol_id = m.get("policy_id")
+        if pol_id and pol_id != "UNASSIGNED":
+            links.append({"source": map_id, "target": pol_id, "type": "remediates"})
+            
+        dept_id = m.get("owner_department_id")
+        if dept_id:
+            links.append({"source": map_id, "target": dept_id, "type": "assigned_dept"})
+
     return {
-        "health_score": 82, "stale_edges": 5, "orphan_clauses": 12,
-        "policy_coverage_rate": 78, "connectivity_score": 85,
-        "issues": [
-            {"type": "stale_edge", "description": "Policy pol_3 links to archived circular RBI/2023-01"},
-            {"type": "orphan_clause", "description": "Clause 4.1 from RBI/2026-ABC has no covering policy"},
-        ],
-        "suggestions": ["Update pol_3 to reference RBI/2026-ABC", "Create new policy for Clause 4.1"],
+        "health_score": health_score,
+        "stale_edges": stale_edges_count,
+        "orphan_clauses": orphan_clauses_count,
+        "policy_coverage_rate": policy_coverage_rate,
+        "connectivity_score": connectivity_score,
+        "issues": issues,
+        "suggestions": suggestions,
+        "graph": {
+            "nodes": nodes,
+            "links": links
+        }
     }
 
 
 @router.post("/graph-health/prune")
 async def prune_graph():
-    return {"status": "success", "message": "Pruned 5 stale edges. Logged to audit."}
+    database = get_db()
+    # Actually delete or clean up stale relationships
+    pruned_count = 0
+    maps_cursor = database.maps.find({})
+    async for m in maps_cursor:
+        map_id = m.get("map_id")
+        circ_id = m.get("circular_id")
+        circular = await database.circulars.find_one({"circular_id": circ_id})
+        
+        # Prune if circular was deleted
+        if not circular:
+            await database.maps.delete_one({"map_id": map_id})
+            pruned_count += 1
+            
+    return {"status": "success", "message": f"Successfully pruned {pruned_count} stale edges from MAP tracking database."}
+
 
 
 @router.post("/ingestion/reparse/{circular_id:path}")

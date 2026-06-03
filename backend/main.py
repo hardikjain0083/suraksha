@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from config import settings
 from database import connect_to_mongo, close_mongo_connection, db
-from api import auth, circulars, gaps, maps, dept, validation, audit, admin, policies, evidence
+from api import auth, circulars, gaps, maps, dept, validation, audit, admin, policies, evidence, cve, assets, incidents
 from api import debug as debug_router_module
 
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +50,9 @@ app.include_router(evidence.router)
 app.include_router(audit.router)
 app.include_router(admin.router,      prefix="/api/admin",     tags=["Admin"])
 app.include_router(policies.router,   prefix="/api/admin/policies", tags=["Policies"])
+app.include_router(cve.router)
+app.include_router(assets.router)
+app.include_router(incidents.router)
 app.include_router(debug_router_module.router, prefix="/api",  tags=["Debug"])
 
 # Serve uploaded proof files

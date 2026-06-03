@@ -20,6 +20,8 @@ import { UxFrictionDashboard } from './pages/admin/UxFrictionDashboard';
 import { UserManagement } from './pages/admin/UserManagement';
 import { IngestionStatusBoard } from './pages/admin/IngestionStatusBoard';
 import { JudgeGuidePage } from './pages/admin/JudgeGuidePage';
+import { IncidentReportDraft } from './pages/admin/IncidentReportDraft';
+import { MttrDashboard } from './pages/admin/MttrDashboard';
 import { VerifyDashboardPage } from './pages/verify/VerifyDashboardPage';
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 import { DepartmentPortalPage } from './pages/dept/DepartmentPortalPage';
@@ -90,6 +92,8 @@ function App() {
           <Route path="/admin/ux-friction" element={<AdminRoute><UxFrictionDashboard /></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
           <Route path="/admin/ingestion" element={<AdminRoute><IngestionStatusBoard /></AdminRoute>} />
+          <Route path="/admin/incidents" element={<AdminRoute><IncidentReportDraft /></AdminRoute>} />
+          <Route path="/admin/mttr" element={<AdminRoute><MttrDashboard /></AdminRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
           {/* Audit (auditor + admin) */}

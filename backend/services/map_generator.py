@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_DEADLINE_DAYS = 45
 
+# Dynamic SLA deadlines used instead of a fixed default
+
 CATEGORY_DEPARTMENT = {
     "cryptography": "DEPT-INFOSEC",
     "authentication": "DEPT-IT",
@@ -321,7 +323,22 @@ async def generate_map_from_gap(
 
     title = generate_title_from_clause(clause_text)
     description = generate_description(clause_text, circular_ctx["title"], policy_title)
-    deadline = datetime.utcnow() + timedelta(days=DEFAULT_DEADLINE_DAYS)
+    
+    # SLA-driven dynamic deadlines
+    sev_lower = (gap.get("severity") or "medium").lower()
+    is_certin = circular_ctx.get("issuer") == "CERT-In"
+    map_type = "security" if (is_certin or category in ("cryptography", "authentication", "network_security", "cybersecurity") or sev_lower in ("critical", "high")) else "operational"
+    
+    if sev_lower == "critical":
+        sla_days = 3
+    elif sev_lower == "high":
+        sla_days = 7
+    elif sev_lower == "medium":
+        sla_days = 15
+    else:
+        sla_days = 30
+        
+    deadline = datetime.utcnow() + timedelta(days=sla_days)
     suggested = suggest_evidence_types(category)
     evidence_items = build_evidence_items(suggested)
 
@@ -349,7 +366,28 @@ async def generate_map_from_gap(
         dept_name,
     )
 
-    status = "approved" if is_historical else "draft"
+    # CISO Escalation Check
+    ciso_escalated = False
+    escalation_reason = None
+    
+    if map_type == "security" and sev_lower in ("critical", "high"):
+        # Extract CVEs from clause text
+        cves = re.findall(r"\b(CVE-\d{4}-\d{4,7})\b", clause_text, re.IGNORECASE)
+        from services.threat_mapper import correlate_advisory_to_assets
+        correlated = await correlate_advisory_to_assets(
+            database=database,
+            cves=cves,
+            systems_affected=[category],
+            full_text=clause_text
+        )
+        # If any correlated asset has critical sensitivity or sensitive customer data category, escalate
+        for asset in correlated:
+            if asset.get("sensitivity") == "critical" or asset.get("category") == "sensitive_customer_data":
+                ciso_escalated = True
+                escalation_reason = f"Critical threat affecting sensitive asset: {asset.get('name')} ({asset.get('asset_id')})"
+                break
+
+    status = "escalated" if ciso_escalated else ("approved" if is_historical else "draft")
     map_id = f"MAP-{uuid.uuid4().hex[:8].upper()}"
 
     requirements = [
@@ -381,6 +419,9 @@ async def generate_map_from_gap(
         "confidence_score": round(confidence, 2),
         "is_historical_match": is_historical,
         "similar_past_maps": [r.model_dump() for r in similar_refs],
+        "map_type": map_type,
+        "ciso_escalated": ciso_escalated,
+        "escalation_reason": escalation_reason,
         "audit_trail": [
             {
                 "timestamp": now,
@@ -399,6 +440,14 @@ async def generate_map_from_gap(
 
     await database.maps.insert_one(map_doc)
 
+    if ciso_escalated:
+        from services.notification import send_notification
+        await send_notification(
+            user_id="EMP-INFOSEC-001",
+            subject="CRITICAL ESCALATION: Sensitive System Exposed",
+            message=f"Critical threat affecting sensitive customer-data system has been escalated. MAP ID: {map_id}. Reason: {escalation_reason}"
+        )
+
     await database.gap_queue.update_one(
         {"gap_id": gap_id},
         {"$set": {"generated_map_id": map_id, "triage_status": "assigned"}},
@@ -411,7 +460,7 @@ async def generate_map_from_gap(
         "timestamp": now,
         "officer_id": officer_id,
         "officer_name": officer_name,
-        "decision": "generated",
+        "decision": "escalated" if ciso_escalated else "generated",
         "title": title,
     })
 

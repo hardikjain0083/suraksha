@@ -173,28 +173,186 @@ export function GraphHealthMonitor() {
         </Panel>
       </div>
 
-      {/* Graph Visualization Placeholder */}
-      <Panel title="Policy Graph Visualization">
-        <div className="flex flex-col items-center justify-center py-16 rounded-lg bg-gradient-to-br from-obsidian-700/50 to-obsidian-800/50 border border-cyber-cyan/10">
-          <svg
-            className="w-20 h-20 mb-4 text-cyber-cyan/40"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.5"
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          <p className="text-lg font-semibold text-cyber-cyan">Interactive Graph Visualization</p>
-          <p className="text-muted-foreground text-sm mt-2">
-            D3.js / React Flow integration coming soon
-          </p>
-        </div>
+      {/* Graph Visualization */}
+      <Panel title="Interactive Compliance Path & Graph Network">
+        <GraphNetworkVisualizer graph={health.graph} />
       </Panel>
     </DashboardLayout>
+  );
+}
+
+function GraphNetworkVisualizer({ graph }: { graph: any }) {
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+
+  if (!graph || !graph.nodes || graph.nodes.length === 0) {
+    return <div className="text-center py-12 text-muted-foreground">No graph mapping network data currently generated. Please upload a circular or parse guidelines first.</div>;
+  }
+
+  // Layered Layout Configuration
+  const width = 1000;
+  const height = 500;
+  
+  // X columns mapping
+  const groupColumns: Record<string, number> = {
+    circular: 80,
+    clause: 280,
+    map: 500,
+    policy: 720,
+    department: 920,
+  };
+
+  // Group colors mapping
+  const groupColors: Record<string, { stroke: string; label: string }> = {
+    circular: { stroke: '#3b82f6', label: 'Circular' },
+    clause: { stroke: '#06b6d4', label: 'Clause' },
+    map: { stroke: '#f59e0b', label: 'MAP' },
+    policy: { stroke: '#a855f7', label: 'Policy' },
+    department: { stroke: '#22c55e', label: 'Dept' },
+  };
+
+  // Count items per group to distribute them vertically
+  const nodesByGroup: Record<string, any[]> = {};
+  graph.nodes.forEach((node: any) => {
+    const grp = node.group || 'unknown';
+    if (!nodesByGroup[grp]) nodesByGroup[grp] = [];
+    nodesByGroup[grp].push(node);
+  });
+
+  // Calculate coordinates for each node
+  const nodePositions: Record<string, { x: number; y: number }> = {};
+  
+  Object.keys(groupColumns).forEach(group => {
+    const groupNodes = nodesByGroup[group] || [];
+    const x = groupColumns[group];
+    groupNodes.forEach((node, idx) => {
+      const y = (idx + 1) * (height / (groupNodes.length + 1));
+      nodePositions[node.id] = { x, y };
+    });
+  });
+
+  // Filter links where both source and target have coordinates
+  const validLinks = (graph.links || []).filter(
+    (link: any) => nodePositions[link.source] && nodePositions[link.target]
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-4">
+      <div className="lg:col-span-3 glass-dark rounded-xl p-4 border border-obsidian-800 relative overflow-hidden bg-obsidian-950/20">
+        {/* Legend */}
+        <div className="absolute top-4 left-4 flex gap-4 text-[10px] font-semibold bg-obsidian-950/80 px-3 py-2 rounded-lg border border-obsidian-800/60 z-10">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />Circular</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />Clause</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" />MAP</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" />Policy</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500" />Dept</span>
+        </div>
+
+        {/* SVG Graph Canvas */}
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto select-none mt-6">
+          {/* Draw Link Lines */}
+          {validLinks.map((link: any, idx: number) => {
+            const p1 = nodePositions[link.source];
+            const p2 = nodePositions[link.target];
+            const isHighlighted = hoveredNode === link.source || hoveredNode === link.target;
+            
+            // Draw smooth bezier curves between columns
+            return (
+              <path
+                key={idx}
+                d={`M ${p1.x} ${p1.y} C ${(p1.x + p2.x) / 2} ${p1.y}, ${(p1.x + p2.x) / 2} ${p2.y}, ${p2.x} ${p2.y}`}
+                fill="none"
+                stroke={isHighlighted ? '#22d3ee' : '#1e293b'}
+                strokeWidth={isHighlighted ? 3 : 1.2}
+                strokeOpacity={isHighlighted ? 1.0 : 0.4}
+                className="transition-all duration-300"
+              />
+            );
+          })}
+
+          {/* Draw Node Circles */}
+          {graph.nodes.map((node: any) => {
+            const pos = nodePositions[node.id];
+            if (!pos) return null;
+
+            const isHovered = hoveredNode === node.id;
+            const isSelected = selectedNode?.id === node.id;
+            const colors = groupColors[node.group] || { stroke: '#94a3b8', label: 'Other' };
+            const strokeColor = isHovered ? '#22d3ee' : isSelected ? '#ffffff' : colors.stroke;
+
+            return (
+              <g
+                key={node.id}
+                transform={`translate(${pos.x}, ${pos.y})`}
+                className="cursor-pointer"
+                onMouseEnter={() => setHoveredNode(node.id)}
+                onMouseLeave={() => setHoveredNode(null)}
+                onClick={() => setSelectedNode(node)}
+              >
+                {/* Node Outer Glow Circle */}
+                <circle
+                  r={isHovered ? 15 : 9}
+                  fill="#0b0f19"
+                  stroke={strokeColor}
+                  strokeWidth={isHovered || isSelected ? 3 : 1.5}
+                  className="transition-all duration-300"
+                />
+                {/* Node Center Dot */}
+                <circle
+                  r={3}
+                  fill={colors.stroke}
+                />
+                
+                {/* Node Label Text */}
+                <text
+                  y={22}
+                  textAnchor="middle"
+                  fill={isHovered ? '#22d3ee' : '#94a3b8'}
+                  className="text-[9px] font-semibold transition-all duration-200 fill-slate-400"
+                >
+                  {node.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Side Panel for details */}
+      <div className="glass-dark rounded-xl p-5 border border-obsidian-800 flex flex-col justify-between bg-obsidian-950/40">
+        {selectedNode ? (
+          <div>
+            <span className={`text-[9px] font-extrabold uppercase px-2.5 py-1 rounded-md border ${
+              selectedNode.group === 'circular' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+              selectedNode.group === 'clause' ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' :
+              selectedNode.group === 'map' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+              selectedNode.group === 'policy' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :
+              'bg-green-500/10 border-green-500/20 text-green-400'
+            }`}>
+              {selectedNode.group} Node
+            </span>
+            <h4 className="text-sm font-bold text-foreground mt-4 leading-snug">{selectedNode.label}</h4>
+            <div className="mt-4 space-y-2 border-t border-obsidian-800/80 pt-3 text-[11px] text-slate-400 leading-relaxed">
+              <div>
+                <span className="font-bold text-slate-500 block">Identifier:</span>
+                <span className="font-mono text-[10px] break-all">{selectedNode.id}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 py-8">
+            <svg className="w-8 h-8 text-slate-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+            </svg>
+            <p className="text-xs">Select any network node to inspect its compliance links.</p>
+          </div>
+        )}
+        <div className="border-t border-obsidian-800/80 pt-4 mt-4">
+          <p className="text-[10px] text-slate-500 leading-normal">
+            This graph highlights the regulatory "Golden Thread" linking circulars to policy requirements, confirmation gaps, and active MAPs.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

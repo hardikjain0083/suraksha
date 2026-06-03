@@ -130,7 +130,7 @@ async def main():
     db = client.suraksha_maps
     
     logger.info("Clearing existing data...")
-    for coll in ["users", "departments", "circulars", "policies", "maps", "evidence", "audit_logs", "gap_queue"]:
+    for coll in ["users", "departments", "circulars", "policies", "maps", "evidence", "audit_logs", "gap_queue", "assets", "escalation_rules", "incident_reports", "compliance_anomalies"]:
         await db[coll].delete_many({})
 
     logger.info("Generating Seed Data...")
@@ -159,6 +159,67 @@ async def main():
             "action_plan": "TBD"
         })
 
+    # Assets & Escalation Rules seed definition
+    mock_assets = [
+        {
+            "asset_id": "SYS-CORE-001",
+            "name": "Core Banking System (CBS)",
+            "category": "sensitive_customer_data",
+            "sensitivity": "critical",
+            "software_stack": ["Oracle DB 19c", "WebLogic Server 14.1.1", "RedHat Enterprise Linux 8.4"],
+            "owner_department_id": "DEPT-IT",
+            "ip_address": "10.0.1.20"
+        },
+        {
+            "asset_id": "SYS-NET-002",
+            "name": "External Perimeter Firewall",
+            "category": "perimeter_security",
+            "sensitivity": "critical",
+            "software_stack": ["Palo Alto GlobalProtect", "PAN-OS Firewall"],
+            "owner_department_id": "DEPT-INFOSEC",
+            "ip_address": "192.168.1.1"
+        },
+        {
+            "asset_id": "SYS-WEB-003",
+            "name": "Internet Banking Portal",
+            "category": "transaction_processing",
+            "sensitivity": "critical",
+            "software_stack": ["Apache Tomcat 9.0.41", "OpenJDK 11", "Ubuntu Server 20.04"],
+            "owner_department_id": "DEPT-IT",
+            "ip_address": "10.0.2.15"
+        },
+        {
+            "asset_id": "SYS-INT-004",
+            "name": "Internal HR Portal",
+            "category": "internal",
+            "sensitivity": "low",
+            "software_stack": ["Apache Tomcat 9.0.20", "OpenJDK 8"],
+            "owner_department_id": "DEPT-HR",
+            "ip_address": "10.0.3.50"
+        }
+    ]
+
+    mock_escalation_rules = [
+        {
+            "rule_id": "rule_ciso_001",
+            "name": "Critical Severity on Sensitive Customer Data System",
+            "condition_severity": "critical",
+            "condition_system_sensitivity": "critical",
+            "escalate_to": "CISO",
+            "notification_channel": "email",
+            "active": True
+        },
+        {
+            "rule_id": "rule_ciso_002",
+            "name": "High Severity on Sensitive Customer Data System",
+            "condition_severity": "high",
+            "condition_system_sensitivity": "critical",
+            "escalate_to": "CISO",
+            "notification_channel": "email",
+            "active": True
+        }
+    ]
+
     logger.info("Inserting Data into MongoDB...")
     if depts: await db.departments.insert_many(depts)
     if users: await db.users.insert_many(users)
@@ -168,6 +229,9 @@ async def main():
     if e: await db.evidence.insert_many(e)
     if gq: await db.gap_queue.insert_many(gq)
     if al: await db.audit_logs.insert_many(al)
+    
+    await db.assets.insert_many(mock_assets)
+    await db.escalation_rules.insert_many(mock_escalation_rules)
     
     logger.info("Database Seeding Complete! Embeddings generated and attached.")
     client.close()

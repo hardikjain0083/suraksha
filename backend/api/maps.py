@@ -844,3 +844,92 @@ async def upload_evidence(
         "file_url": f"/uploads/{filename}",
     }
 
+
+# ─── CISO Override & MTTR Endpoints ──────────────────────────────────────────
+
+class CisoRejectBody(BaseModel):
+    reason: str
+
+@router.get("/mttr/metrics")
+async def get_mttr_metrics():
+    """Retrieve MTTR (Mean Time to Remediation) metrics and SLA compliance rates."""
+    from services.mttr_service import calculate_mttr_metrics
+    database = get_db()
+    metrics = await calculate_mttr_metrics(database)
+    return metrics
+
+@router.post("/{map_id}/ciso-approve")
+async def ciso_approve_map(map_id: str, current_user: dict = Depends(get_current_user)):
+    """CISO overrides and approves an escalated critical MAP."""
+    if current_user.get("role") not in ("admin", "compliance_officer", "department_head"):
+        raise HTTPException(status_code=403, detail="CISO/Admin access required for escalation overrides.")
+        
+    database = get_db()
+    m = await database.maps.find_one({"map_id": map_id})
+    if not m:
+        raise HTTPException(status_code=404, detail="MAP not found")
+        
+    now = datetime.utcnow()
+    await database.maps.update_one(
+        {"map_id": map_id},
+        {
+            "$set": {
+                "status": "approved",
+                "approved_at": now,
+                "ciso_override_status": "approved",
+                "timeline": build_timeline("approved", m.get("created_at", now), now)
+            }
+        }
+    )
+    
+    await log_audit(
+        database, map_id,
+        current_user["emp_id"], current_user.get("name", "CISO Officer"),
+        "ciso_override_approved",
+        "CISO formally approved critical security MAP override. Status set to Approved."
+    )
+    
+    # Auto route to open for active assignment
+    await database.maps.update_one({"map_id": map_id}, {"$set": {"status": "open"}})
+    
+    return {"status": "approved", "map_id": map_id, "message": "MAP override approved by CISO."}
+
+@router.post("/{map_id}/ciso-reject")
+async def ciso_reject_map(map_id: str, body: CisoRejectBody, current_user: dict = Depends(get_current_user)):
+    """CISO rejects / dismisses an escalated critical MAP."""
+    if current_user.get("role") not in ("admin", "compliance_officer", "department_head"):
+        raise HTTPException(status_code=403, detail="CISO/Admin access required for escalation overrides.")
+        
+    database = get_db()
+    m = await database.maps.find_one({"map_id": map_id})
+    if not m:
+        raise HTTPException(status_code=404, detail="MAP not found")
+        
+    now = datetime.utcnow()
+    await database.maps.update_one(
+        {"map_id": map_id},
+        {
+            "$set": {
+                "status": "rejected",
+                "ciso_override_status": "rejected",
+                "reject_reason": body.reason
+            }
+        }
+    )
+    
+    await log_audit(
+        database, map_id,
+        current_user["emp_id"], current_user.get("name", "CISO Officer"),
+        "ciso_override_rejected",
+        f"CISO rejected/dismissed security MAP. Reason: {body.reason}"
+    )
+    
+    if m.get("gap_id"):
+        await database.gap_queue.update_one(
+            {"gap_id": m["gap_id"]},
+            {"$set": {"triage_status": "dismissed", "dismiss_reason": body.reason}}
+        )
+        
+    return {"status": "rejected", "map_id": map_id, "message": "MAP override rejected by CISO."}
+
+

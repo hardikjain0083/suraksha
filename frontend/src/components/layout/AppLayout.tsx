@@ -20,6 +20,7 @@ import {
   Cpu,
   Activity,
   Terminal,
+  ShieldAlert,
 } from 'lucide-react';
 
 // ─── Nav configs grouped by categories ───────────────────────────────────────
@@ -39,6 +40,13 @@ const adminNavGroups = [
       { to: '/admin/gaps', icon: Search, label: 'Gap Detection' },
       { to: '/admin/gaps/queue', icon: CheckSquare, label: 'Triage Queue' },
       { to: '/admin/validation', icon: Zap, label: 'Evidence Validation' },
+    ]
+  },
+  {
+    title: 'Cyber Orchestration',
+    items: [
+      { to: '/admin/incidents', icon: ShieldAlert, label: 'Incident Desk' },
+      { to: '/admin/mttr', icon: BarChart3, label: 'MTTR Tracking' },
     ]
   },
   {
