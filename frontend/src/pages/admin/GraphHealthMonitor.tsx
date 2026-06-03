@@ -10,6 +10,8 @@ import {
   Alert,
 } from '../../components/ui/cards';
 
+const t = (s: string) => s;
+
 export function GraphHealthMonitor() {
   const [health, setHealth] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,7 @@ export function GraphHealthMonitor() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="inline-block w-12 h-12 border-2 border-cyber-cyan border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-muted-foreground">Loading graph health data...</p>
+            <p className="text-muted-foreground">{t('Loading graph health data...')}</p>
           </div>
         </div>
       </DashboardLayout>
@@ -145,7 +147,7 @@ export function GraphHealthMonitor() {
           ) : (
             <div className="flex items-center justify-center py-8">
               <CheckCircle2 size={32} className="text-green-400 opacity-70" />
-              <p className="text-muted-foreground ml-3">All systems operational</p>
+              <p className="text-muted-foreground ml-3">{t('All systems operational')}</p>
             </div>
           )}
         </Panel>
@@ -167,7 +169,7 @@ export function GraphHealthMonitor() {
             </ul>
           ) : (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <p>No suggestions at this time</p>
+              <p>{t('No suggestions at this time')}</p>
             </div>
           )}
         </Panel>
@@ -186,7 +188,7 @@ function GraphNetworkVisualizer({ graph }: { graph: any }) {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   if (!graph || !graph.nodes || graph.nodes.length === 0) {
-    return <div className="text-center py-12 text-muted-foreground">No graph mapping network data currently generated. Please upload a circular or parse guidelines first.</div>;
+    return <div className="text-center py-12 text-muted-foreground">{t('No graph mapping network data currently generated. Please upload a circular or parse guidelines first.')}</div>;
   }
 
   // Layered Layout Configuration
@@ -194,46 +196,45 @@ function GraphNetworkVisualizer({ graph }: { graph: any }) {
   const height = 500;
   
   // X columns mapping
-  const groupColumns: Record<string, number> = {
-    circular: 80,
-    clause: 280,
-    map: 500,
-    policy: 720,
-    department: 920,
-  };
+  const groupColumns = new Map<string, number>([
+    ['circular', 80],
+    ['clause', 280],
+    ['map', 500],
+    ['policy', 720],
+    ['department', 920],
+  ]);
 
   // Group colors mapping
-  const groupColors: Record<string, { stroke: string; label: string }> = {
-    circular: { stroke: '#3b82f6', label: 'Circular' },
-    clause: { stroke: '#06b6d4', label: 'Clause' },
-    map: { stroke: '#f59e0b', label: 'MAP' },
-    policy: { stroke: '#a855f7', label: 'Policy' },
-    department: { stroke: '#22c55e', label: 'Dept' },
-  };
+  const groupColors = new Map<string, { stroke: string; label: string }>([
+    ['circular', { stroke: '#3b82f6', label: 'Circular' }],
+    ['clause', { stroke: '#06b6d4', label: 'Clause' }],
+    ['map', { stroke: '#f59e0b', label: 'MAP' }],
+    ['policy', { stroke: '#a855f7', label: 'Policy' }],
+    ['department', { stroke: '#22c55e', label: 'Dept' }],
+  ]);
 
   // Count items per group to distribute them vertically
-  const nodesByGroup: Record<string, any[]> = {};
+  const nodesByGroup = new Map<string, any[]>();
   graph.nodes.forEach((node: any) => {
     const grp = node.group || 'unknown';
-    if (!nodesByGroup[grp]) nodesByGroup[grp] = [];
-    nodesByGroup[grp].push(node);
+    if (!nodesByGroup.has(grp)) nodesByGroup.set(grp, []);
+    nodesByGroup.get(grp)!.push(node);
   });
 
   // Calculate coordinates for each node
-  const nodePositions: Record<string, { x: number; y: number }> = {};
+  const nodePositions = new Map<string, { x: number; y: number }>();
   
-  Object.keys(groupColumns).forEach(group => {
-    const groupNodes = nodesByGroup[group] || [];
-    const x = groupColumns[group];
+  groupColumns.forEach((x, group) => {
+    const groupNodes = nodesByGroup.get(group) || [];
     groupNodes.forEach((node, idx) => {
       const y = (idx + 1) * (height / (groupNodes.length + 1));
-      nodePositions[node.id] = { x, y };
+      nodePositions.set(node.id, { x, y });
     });
   });
 
   // Filter links where both source and target have coordinates
   const validLinks = (graph.links || []).filter(
-    (link: any) => nodePositions[link.source] && nodePositions[link.target]
+    (link: any) => nodePositions.has(link.source) && nodePositions.has(link.target)
   );
 
   return (
@@ -252,8 +253,9 @@ function GraphNetworkVisualizer({ graph }: { graph: any }) {
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto select-none mt-6">
           {/* Draw Link Lines */}
           {validLinks.map((link: any, idx: number) => {
-            const p1 = nodePositions[link.source];
-            const p2 = nodePositions[link.target];
+            const p1 = nodePositions.get(link.source);
+            const p2 = nodePositions.get(link.target);
+            if (!p1 || !p2) return null;
             const isHighlighted = hoveredNode === link.source || hoveredNode === link.target;
             
             // Draw smooth bezier curves between columns
@@ -272,12 +274,12 @@ function GraphNetworkVisualizer({ graph }: { graph: any }) {
 
           {/* Draw Node Circles */}
           {graph.nodes.map((node: any) => {
-            const pos = nodePositions[node.id];
+            const pos = nodePositions.get(node.id);
             if (!pos) return null;
 
             const isHovered = hoveredNode === node.id;
             const isSelected = selectedNode?.id === node.id;
-            const colors = groupColors[node.group] || { stroke: '#94a3b8', label: 'Other' };
+            const colors = groupColors.get(node.group) || { stroke: '#94a3b8', label: 'Other' };
             const strokeColor = isHovered ? '#22d3ee' : isSelected ? '#ffffff' : colors.stroke;
 
             return (
@@ -334,7 +336,7 @@ function GraphNetworkVisualizer({ graph }: { graph: any }) {
             <h4 className="text-sm font-bold text-foreground mt-4 leading-snug">{selectedNode.label}</h4>
             <div className="mt-4 space-y-2 border-t border-obsidian-800/80 pt-3 text-[11px] text-slate-400 leading-relaxed">
               <div>
-                <span className="font-bold text-slate-500 block">Identifier:</span>
+                <span className="font-bold text-slate-500 block">{t('Identifier:')}</span>
                 <span className="font-mono text-[10px] break-all">{selectedNode.id}</span>
               </div>
             </div>
@@ -344,7 +346,7 @@ function GraphNetworkVisualizer({ graph }: { graph: any }) {
             <svg className="w-8 h-8 text-slate-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
             </svg>
-            <p className="text-xs">Select any network node to inspect its compliance links.</p>
+            <p className="text-xs">{t('Select any network node to inspect its compliance links.')}</p>
           </div>
         )}
         <div className="border-t border-obsidian-800/80 pt-4 mt-4">

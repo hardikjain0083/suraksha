@@ -23,6 +23,8 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 
+const t = (s: string) => s;
+
 // ─── Nav configs grouped by categories ───────────────────────────────────────
 
 const adminNavGroups = [
@@ -160,11 +162,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Public Footer */}
         <footer className="bg-obsidian-950/90 text-muted-foreground py-6 text-center text-xs font-mono border-t border-cyber-cyan/10 mt-auto z-10">
-          <p className="text-cyber-cyan/50">SuRaksha Compliance Intelligence Platform &copy; 2026</p>
+          <p className="text-cyber-cyan/50">{t('SuRaksha Compliance Intelligence Platform ')} &copy; 2026</p>
           <p className="mt-1 opacity-50 flex justify-center gap-4 text-[10px]">
-            <span className="text-cyber-blue">AI-POWERED COGNITIVE DECOMPOSITION</span>
+            <span className="text-cyber-blue">{t('AI-POWERED COGNITIVE DECOMPOSITION')}</span>
             <span>•</span>
-            <span className="text-cyber-green">SECURE HASH VERIFICATION</span>
+            <span className="text-cyber-green">{t('SECURE HASH VERIFICATION')}</span>
           </p>
         </footer>
       </div>
@@ -198,8 +200,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             {sidebarOpen && (
               <div className="flex flex-col">
-                <span className="text-sm font-bold tracking-widest text-cyber-cyan font-mono">SURAKSHA</span>
-                <span className="text-[10px] text-cyber-blue font-mono font-bold tracking-wider">MAPS v4.0</span>
+                <span className="text-sm font-bold tracking-widest text-cyber-cyan font-mono">{t('SURAKSHA')}</span>
+                <span className="text-[10px] text-cyber-blue font-mono font-bold tracking-wider">{t('MAPS v4.0')}</span>
               </div>
             )}
           </div>
@@ -288,7 +290,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             title="Terminate Session"
           >
             <LogOut className="w-4 h-4" />
-            {sidebarOpen && <span>LOGOUT SESSION</span>}
+             {sidebarOpen && <span>{t('LOGOUT SESSION')}</span>}
           </button>
         </div>
 
@@ -323,7 +325,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-6">
             {/* Threat Index */}
             <div className="hidden md:flex items-center gap-2 border border-cyber-cyan/10 bg-obsidian-900/50 px-3 py-1 rounded font-mono text-[10px]">
-              <span className="text-slate-500">THREAT_LEVEL:</span>
+              <span className="text-slate-500">{t('THREAT_LEVEL:')}</span>
               <span className="text-cyber-green font-bold flex items-center gap-1 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyber-green" />
                 {threatLevel} ({threatRatio}%)
@@ -332,8 +334,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Shield State */}
             <div className="hidden sm:flex items-center gap-2 border border-cyber-cyan/10 bg-obsidian-900/50 px-3 py-1 rounded font-mono text-[10px]">
-              <span className="text-slate-500">SECURE_TUNNEL:</span>
-              <span className="text-cyber-cyan font-bold">AES_256_GCM</span>
+              <span className="text-slate-500">{t('SECURE_TUNNEL:')}</span>
+              <span className="text-cyber-cyan font-bold">{t('AES_256_GCM')}</span>
             </div>
 
             {/* Quick guide and tools */}
@@ -365,8 +367,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Dashboard Footer */}
         <footer className="h-10 bg-obsidian-950 border-t border-cyber-cyan/10 flex items-center justify-between px-6 text-[10px] font-mono text-muted-foreground shrink-0">
-          <span className="text-cyber-cyan/40">SuRaksha MAPS © 2026. Zero Trust Compliance Ledger Active.</span>
-          <span className="text-cyber-blue font-bold">SECURE NODE // SESSION_ID: {localStorage.getItem('session_id')?.substring(0, 8) || 'N/A_LOCAL'}</span>
+          <span className="text-cyber-cyan/40">{t('SuRaksha MAPS © 2026. Zero Trust Compliance Ledger Active.')}</span>
+          <span className="text-cyber-blue font-bold">{t('SECURE NODE // SESSION_ID: ')}{localStorage.getItem('session_id')?.substring(0, 8) || 'N/A_LOCAL'}</span>
         </footer>
       </div>
     </div>

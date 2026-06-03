@@ -3,6 +3,8 @@ import { AlertTriangle, Clock, Send, ShieldAlert, CheckCircle, Edit, ListFilter,
 import { apiClient } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
+const t = (s: string) => s;
+
 export function IncidentReportDraft() {
   const [incidents, setIncidents] = useState<any[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
@@ -118,7 +120,7 @@ export function IncidentReportDraft() {
       <div className="flex items-center justify-center min-h-[300px]">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 text-cyber-cyan animate-spin mx-auto mb-4" />
-          <p className="text-slate-400">Loading incident drafts...</p>
+          <p className="text-slate-400">{t('Loading incident drafts...')}</p>
         </div>
       </div>
     );
@@ -129,10 +131,10 @@ export function IncidentReportDraft() {
       <div className="flex justify-between items-center border-b border-obsidian-800 pb-4">
         <div>
           <h1 className="text-3xl font-bold font-mono text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-cyber-cyan">
-            CERT-In Incident Report Drafting
+            {t('CERT-In Incident Report Drafting')}
           </h1>
           <p className="text-slate-400 mt-2">
-            Draft, review, and dispatch regulatory Form 1 incident reports within the required 6-hour SLA window.
+            {t('Draft, review, and dispatch regulatory Form 1 incident reports within the required 6-hour SLA window.')}
           </p>
         </div>
         <button 
@@ -199,7 +201,7 @@ export function IncidentReportDraft() {
                     <ShieldAlert className="text-red-500" />
                     {selectedIncident.report_id}
                   </CardTitle>
-                  <span className="text-xs text-slate-500 mt-1 block">Created at: {new Date(selectedIncident.created_at).toLocaleString()}</span>
+                  <span className="text-xs text-slate-500 mt-1 block">{t('Created at: ')}{new Date(selectedIncident.created_at).toLocaleString()}</span>
                 </div>
                 
                 <div className="flex gap-2">
@@ -234,7 +236,7 @@ export function IncidentReportDraft() {
                   <form onSubmit={handleUpdate} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-bold text-slate-500 block mb-1">Report Title</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">{t('Report Title')}</label>
                         <input
                           type="text"
                           required
@@ -244,22 +246,22 @@ export function IncidentReportDraft() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-bold text-slate-500 block mb-1">Severity Rating</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">{t('Severity Rating')}</label>
                         <select
                           value={editForm.severity}
                           onChange={(e) => setEditForm({ ...editForm, severity: e.target.value })}
                           className="w-full bg-obsidian-900 border border-obsidian-800 rounded-lg p-2.5 text-sm text-foreground focus:border-red-500 focus:outline-none"
                         >
-                          <option value="critical">Critical</option>
-                          <option value="high">High</option>
-                          <option value="medium">Medium</option>
-                          <option value="low">Low</option>
+                          <option value="critical">{t('Critical')}</option>
+                          <option value="high">{t('High')}</option>
+                          <option value="medium">{t('Medium')}</option>
+                          <option value="low">{t('Low')}</option>
                         </select>
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-slate-500 block mb-1">Systems Affected (comma-separated)</label>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">{t('Systems Affected (comma-separated)')}</label>
                       <input
                         type="text"
                         required
@@ -270,7 +272,7 @@ export function IncidentReportDraft() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-slate-500 block mb-1">Technical Incident Details</label>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">{t('Technical Incident Details')}</label>
                       <textarea
                         required
                         rows={4}
@@ -281,7 +283,7 @@ export function IncidentReportDraft() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-slate-500 block mb-1">Planned / Implemented Mitigation Actions</label>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">{t('Planned / Implemented Mitigation Actions')}</label>
                       <textarea
                         required
                         rows={3}
@@ -293,7 +295,7 @@ export function IncidentReportDraft() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-bold text-slate-500 block mb-1">Reporter Name</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">{t('Reporter Name')}</label>
                         <input
                           type="text"
                           required
@@ -303,7 +305,7 @@ export function IncidentReportDraft() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-bold text-slate-500 block mb-1">Reporter Email</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">{t('Reporter Email')}</label>
                         <input
                           type="email"
                           required
@@ -319,7 +321,7 @@ export function IncidentReportDraft() {
                         type="submit"
                         className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-orange-500 text-white font-bold rounded-lg text-sm hover:shadow-glow-red hover:scale-105 transition-all"
                       >
-                        Save Draft Updates
+                        {t('Save Draft Updates')}
                       </button>
                     </div>
                   </form>
@@ -327,17 +329,17 @@ export function IncidentReportDraft() {
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-obsidian-850 pb-4">
                       <div>
-                        <span className="text-xs text-slate-500 block font-bold">Document Title:</span>
+                        <span className="text-xs text-slate-500 block font-bold">{t('Document Title:')}</span>
                         <span className="text-sm font-semibold">{selectedIncident.title}</span>
                       </div>
                       <div>
-                        <span className="text-xs text-slate-500 block font-bold">Severity:</span>
+                        <span className="text-xs text-slate-500 block font-bold">{t('Severity:')}</span>
                         <span className="text-sm font-semibold capitalize">{selectedIncident.severity}</span>
                       </div>
                     </div>
 
                     <div>
-                      <span className="text-xs text-slate-500 block font-bold mb-1">Systems / Products Affected:</span>
+                      <span className="text-xs text-slate-500 block font-bold mb-1">{t('Systems / Products Affected:')}</span>
                       <div className="flex flex-wrap gap-1.5">
                         {(selectedIncident.systems_affected || []).map((sys: string, idx: number) => (
                           <span key={idx} className="text-xs bg-obsidian-900 border border-obsidian-800 px-2.5 py-1 rounded-md">
@@ -348,14 +350,14 @@ export function IncidentReportDraft() {
                     </div>
 
                     <div>
-                      <span className="text-xs text-slate-500 block font-bold">Technical Description of Threat:</span>
+                      <span className="text-xs text-slate-500 block font-bold">{t('Technical Description of Threat:')}</span>
                       <p className="text-sm text-slate-300 bg-obsidian-950/40 p-4 rounded-xl border border-obsidian-850 mt-1 whitespace-pre-wrap leading-relaxed font-mono text-[11px]">
                         {selectedIncident.incident_details}
                       </p>
                     </div>
 
                     <div>
-                      <span className="text-xs text-slate-500 block font-bold">Remediation Action Plan:</span>
+                      <span className="text-xs text-slate-500 block font-bold">{t('Remediation Action Plan:')}</span>
                       <p className="text-sm text-slate-300 bg-obsidian-950/40 p-4 rounded-xl border border-obsidian-850 mt-1 whitespace-pre-wrap leading-relaxed font-mono text-[11px]">
                         {selectedIncident.mitigation_actions}
                       </p>
@@ -363,11 +365,11 @@ export function IncidentReportDraft() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-obsidian-850 pt-4 text-xs text-slate-400">
                       <div>
-                        <span className="text-slate-500 font-bold block">Officer Signature:</span>
+                        <span className="text-slate-500 font-bold block">{t('Officer Signature:')}</span>
                         <span>{selectedIncident.reporter_name} ({selectedIncident.reporter_email})</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-bold block">Regulatory Status:</span>
+                        <span className="text-slate-500 font-bold block">{t('Regulatory Status:')}</span>
                         <span className={selectedIncident.status === 'submitted' ? 'text-green-400' : 'text-orange-400'}>
                           {selectedIncident.status === 'submitted' ? 'Filed with CERT-In' : 'Pending Filing'}
                         </span>
@@ -380,7 +382,7 @@ export function IncidentReportDraft() {
           ) : (
             <div className="h-full flex flex-col items-center justify-center py-20 rounded-xl bg-obsidian-950/20 border border-obsidian-850/40 text-slate-400">
               <ShieldAlert className="w-12 h-12 text-slate-700 mb-4 animate-pulse" />
-              <p className="text-sm font-semibold">Select an incident from the list or ingest a CERT-In advisory to generate a draft report.</p>
+              <p className="text-sm font-semibold">{t('Select an incident from the list or ingest a CERT-In advisory to generate a draft report.')}</p>
             </div>
           )}
         </div>

@@ -29,6 +29,8 @@ const trendData = [
   { day: '05-18', compliance: 93, activeGaps: 3 },
 ];
 
+const t = (s: string) => s;
+
 export function AdminDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +59,7 @@ export function AdminDashboard() {
             <Shield className="w-6 h-6 animate-pulse" />
           </div>
         </div>
-        <p className="animate-pulse tracking-widest text-xs">SYNCHRONIZING SECURE COMMAND MATRIX...</p>
+        <p className="animate-pulse tracking-widest text-xs">{t('SYNCHRONIZING SECURE COMMAND MATRIX...')}</p>
       </div>
     );
   }
@@ -83,8 +85,8 @@ export function AdminDashboard() {
         </div>
         <div className="flex items-center gap-3 bg-obsidian-950 px-3 py-1.5 border border-cyber-cyan/15 rounded text-[10px] font-mono">
           <span className="w-2 h-2 rounded-full bg-cyber-green animate-pulse" />
-          <span className="text-slate-400">LEDGER STATE:</span>
-          <span className="text-cyber-green font-bold">SYNCHRONIZED // BLOCK_HEIGHT 8129B</span>
+          <span className="text-slate-400">{t('LEDGER STATE:')}</span>
+          <span className="text-cyber-green font-bold">{t('SYNCHRONIZED // BLOCK_HEIGHT 8129B')}</span>
         </div>
       </div>
 
@@ -95,7 +97,7 @@ export function AdminDashboard() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-cyber-cyan/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Regulatory Coverage</span>
+              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{t('Regulatory Coverage')}</span>
               <h3 className="text-3xl font-bold font-mono text-cyber-cyan tracking-tight">
                 {data.regulatory_coverage.processed}<span className="text-sm font-semibold text-slate-500"> / {data.regulatory_coverage.total}</span>
               </h3>
@@ -105,7 +107,7 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span>Circulars fully mapped</span>
+            <span>{t('Circulars fully mapped')}</span>
             <span className="text-cyber-green font-bold">
               {Math.round((data.regulatory_coverage.processed / (data.regulatory_coverage.total || 1)) * 100)}% Coverage
             </span>
@@ -123,7 +125,7 @@ export function AdminDashboard() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-cyber-magenta/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Active Confirmed Gaps</span>
+              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{t('Active Confirmed Gaps')}</span>
               <h3 className="text-3xl font-bold font-mono text-cyber-magenta tracking-tight">
                 {data.active_gaps.confirmed}
               </h3>
@@ -133,7 +135,7 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span>Requires instant mitigation</span>
+            <span>{t('Requires instant mitigation')}</span>
             <span className="text-cyber-blue font-bold">
               {data.active_gaps.suspected} Suspected
             </span>
@@ -151,7 +153,7 @@ export function AdminDashboard() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-cyber-blue/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">MAP Completion Rate</span>
+              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{t('MAP Completion Rate')}</span>
               <h3 className="text-3xl font-bold font-mono text-cyber-blue tracking-tight">
                 {data.map_completion.rate}%
               </h3>
@@ -162,7 +164,7 @@ export function AdminDashboard() {
           </div>
           <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
             <span>On-time execution target</span>
-            <span className="text-cyber-cyan font-bold">ALPHA RATE</span>
+            <span className="text-cyber-cyan font-bold">{t('ALPHA RATE')}</span>
           </div>
           <div className="h-1 bg-obsidian-950 rounded-full mt-2.5 overflow-hidden">
             <div 
@@ -177,7 +179,7 @@ export function AdminDashboard() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-cyber-green/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Behavioral Health</span>
+              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{t('Behavioral Health')}</span>
               <h3 className="text-3xl font-bold font-mono text-cyber-green tracking-tight">
                 {data.behavioral_health.green_sessions}%
               </h3>
@@ -187,8 +189,8 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span>Zero-Trust validation</span>
-            <span className="text-cyber-green font-bold">SECURE SESSIONS</span>
+            <span>{t('Zero-Trust validation')}</span>
+            <span className="text-cyber-green font-bold">{t('SECURE SESSIONS')}</span>
           </div>
           <div className="h-1 bg-obsidian-950 rounded-full mt-2.5 overflow-hidden">
             <div 
@@ -209,7 +211,7 @@ export function AdminDashboard() {
                 <TrendingUp className="w-4 h-4 text-cyber-cyan" />
                 Cognitive Defense Trends (7-Day Metric)
               </h2>
-              <span className="text-[10px] font-mono text-muted-foreground">REAL-TIME TELEMETRY FEED</span>
+              <span className="text-[10px] font-mono text-muted-foreground">{t('REAL-TIME TELEMETRY FEED')}</span>
             </div>
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -240,11 +242,11 @@ export function AdminDashboard() {
 
           <div className="grid grid-cols-2 gap-4 border-t border-cyber-cyan/10 pt-4 mt-4 text-[10px] font-mono">
             <div className="p-2.5 bg-obsidian-950/60 rounded border border-cyber-cyan/5">
-              <div className="text-slate-500">PEAK COMPLIANCE RATE:</div>
+              <div className="text-slate-500">{t('PEAK COMPLIANCE RATE:')}</div>
               <div className="text-cyber-cyan font-bold text-sm mt-0.5">93.0% (MAXIMUM SECURED)</div>
             </div>
             <div className="p-2.5 bg-obsidian-950/60 rounded border border-cyber-cyan/5">
-              <div className="text-slate-500">MITIGATION VELOCITY:</div>
+              <div className="text-slate-500">{t('MITIGATION VELOCITY:')}</div>
               <div className="text-cyber-magenta font-bold text-sm mt-0.5">-1.57 GAPS / DAY (EFFICIENT)</div>
             </div>
           </div>
@@ -302,8 +304,8 @@ export function AdminDashboard() {
             )}
           </div>
           <div className="mt-3 flex justify-between items-center text-[9px] font-mono text-slate-500">
-            <span>PACKETS BUFFERED: {filteredAlerts.length}</span>
-            <span className="animate-pulse text-cyber-cyan">SCANNING CHANNEL...</span>
+            <span>{t('PACKETS BUFFERED: ')}{filteredAlerts.length}</span>
+            <span className="animate-pulse text-cyber-cyan">{t('SCANNING CHANNEL...')}</span>
           </div>
         </GlassCard>
       </div>
@@ -324,8 +326,8 @@ export function AdminDashboard() {
                 <Layers className="w-5 h-5" />
               </div>
               <div className="text-left">
-                <span className="block text-xs font-bold text-slate-200">Policy Manager</span>
-                <span className="text-[10px] text-slate-500">Audit policy versions</span>
+                <span className="block text-xs font-bold text-slate-200">{t('Policy Manager')}</span>
+                <span className="text-[10px] text-slate-500">{t('Audit policy versions')}</span>
               </div>
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-cyber-blue group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -340,8 +342,8 @@ export function AdminDashboard() {
                 <Activity className="w-5 h-5 animate-pulse" />
               </div>
               <div className="text-left">
-                <span className="block text-xs font-bold text-slate-200">Graph Diagnostics</span>
-                <span className="text-[10px] text-slate-500">Monitor graph database</span>
+                <span className="block text-xs font-bold text-slate-200">{t('Graph Diagnostics')}</span>
+                <span className="text-[10px] text-slate-500">{t('Monitor graph database')}</span>
               </div>
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-cyber-cyan group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -356,8 +358,8 @@ export function AdminDashboard() {
                 <Search className="w-5 h-5" />
               </div>
               <div className="text-left">
-                <span className="block text-xs font-bold text-slate-200">UX Audit Console</span>
-                <span className="text-[10px] text-slate-500">Trace user telemetry</span>
+                <span className="block text-xs font-bold text-slate-200">{t('UX Audit Console')}</span>
+                <span className="text-[10px] text-slate-500">{t('Trace user telemetry')}</span>
               </div>
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-cyber-magenta group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -372,8 +374,8 @@ export function AdminDashboard() {
                 <Users className="w-5 h-5" />
               </div>
               <div className="text-left">
-                <span className="block text-xs font-bold text-slate-200">Access Controls</span>
-                <span className="text-[10px] text-slate-500">Modify member roles</span>
+                <span className="block text-xs font-bold text-slate-200">{t('Access Controls')}</span>
+                <span className="text-[10px] text-slate-500">{t('Modify member roles')}</span>
               </div>
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-cyber-green group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />

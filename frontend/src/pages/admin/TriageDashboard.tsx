@@ -14,6 +14,8 @@ import { GlassCard } from '@/components/ui/glass-card';
 
 type ProcessedFilter = 'all' | 'approved' | 'rejected' | 'escalated';
 
+const t = (s: string) => s;
+
 const AutoRoutedCard = ({
   card,
   selected,
@@ -86,7 +88,7 @@ const AutoRoutedCard = ({
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-xs text-slate-600 italic font-mono">No similar precedent MAPs indexed yet</p>
+                  <p className="text-xs text-slate-600 italic font-mono">{t('No similar precedent MAPs indexed yet')}</p>
                 )}
               </div>
               <p className="text-[10px] text-slate-500 font-mono">
@@ -228,7 +230,7 @@ export const TriageDashboard = () => {
           animate={{ opacity: 1, y: 0 }}
           className="p-4 bg-cyber-blue/10 border border-cyber-blue/30 rounded-xl text-xs font-mono text-slate-300 leading-relaxed shadow-glow-blue/10"
         >
-          <strong>Judge Walkthrough instructions:</strong> Auto-routed MAPs (green) use historical precedent — bulk approve when
+          <strong>{t('Judge Walkthrough instructions:')}</strong> Auto-routed MAPs (green) use historical precedent — bulk approve when
           confidence ≥ 80%. Pending review (magenta) requires clause-vs-MAP comparison and department assignment.
           Provenance flows Circular → Clause → Gap → Policy → Department.
         </motion.div>
@@ -237,7 +239,7 @@ export const TriageDashboard = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-32 font-mono text-cyber-cyan gap-3">
           <Loader2 className="w-8 h-8 animate-spin" />
-          <p className="animate-pulse tracking-widest text-[10px]">VERIFYING TRIAGE PARAMS...</p>
+          <p className="animate-pulse tracking-widest text-[10px]">{t('VERIFYING TRIAGE PARAMS...')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -246,7 +248,7 @@ export const TriageDashboard = () => {
             <div className="flex items-center justify-between mb-4 border-b border-cyber-green/10 pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-cyber-green animate-pulse" />
-                <h2 className="font-bold text-xs text-slate-200 font-mono">AUTO-ROUTED PRECEDENTS</h2>
+                <h2 className="font-bold text-xs text-slate-200 font-mono">{t('AUTO-ROUTED PRECEDENTS')}</h2>
                 <span className="text-[9px] bg-cyber-green/20 text-cyber-green border border-cyber-green/30 px-2 py-0.5 rounded-full font-bold">
                   {autoRouted.length}
                 </span>
@@ -286,7 +288,7 @@ export const TriageDashboard = () => {
           <GlassCard className="border-cyber-magenta/20 bg-cyber-magenta/5/10 p-5 h-[750px] flex flex-col">
             <div className="flex items-center gap-2 mb-4 border-b border-cyber-magenta/10 pb-3 shrink-0">
               <div className="w-2.5 h-2.5 rounded-full bg-cyber-magenta animate-pulse" />
-              <h2 className="font-bold text-xs text-slate-200 font-mono">PENDING HUMAN REVIEW</h2>
+              <h2 className="font-bold text-xs text-slate-200 font-mono">{t('PENDING HUMAN REVIEW')}</h2>
               <span className="text-[9px] bg-cyber-magenta/25 text-cyber-magenta border border-cyber-magenta/30 px-2 py-0.5 rounded-full font-bold">
                 {pendingReview.length}
               </span>
@@ -327,7 +329,7 @@ export const TriageDashboard = () => {
           <GlassCard className="border-cyber-cyan/20 bg-cyber-cyan/5/10 p-5 h-[750px] flex flex-col">
             <div className="flex items-center gap-2 mb-4 border-b border-cyber-cyan/10 pb-3 shrink-0">
               <History className="w-4 h-4 text-cyber-cyan" />
-              <h2 className="font-bold text-xs text-slate-200 font-mono">COMPLETED AUDIT BLOCKS</h2>
+              <h2 className="font-bold text-xs text-slate-200 font-mono">{t('COMPLETED AUDIT BLOCKS')}</h2>
             </div>
             
             <div className="flex gap-1 mb-4 flex-wrap shrink-0">
@@ -365,7 +367,7 @@ export const TriageDashboard = () => {
                       {new Date(a.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-                  <p className="text-slate-300 mt-1 font-bold">Officer: {a.officer_name}</p>
+                  <p className="text-slate-300 mt-1 font-bold">{t('Officer: ')}{a.officer_name}</p>
                   {a.title && <p className="text-slate-400 mt-1 line-clamp-1 font-sans text-[11px]">{a.title}</p>}
                   {a.map_id && (
                     <button
