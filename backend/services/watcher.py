@@ -14,6 +14,8 @@ from docx import Document
 
 from models.circular import Clause
 from services.notification import send_notification
+from config import settings
+from services.ocr_extractor import OCRExtractor, OCRException, LowConfidenceException
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +62,12 @@ async def generate_embeddings(texts: List[str]) -> List[List[float]]:
 @dataclass
 class PDFExtractionResult:
     text: str
-    tables: List[List[List[str]]]
+    tables: List[Any]  # Keep generic to support both nested lists and structured Textract tables
     is_index_page: bool
     confidence: float
     engine_used: str = "unknown"
+    ocr_metadata: Optional[dict] = None
+    flagged_for_manual_review: bool = False
 
 
 # ─────────────────────────────────────────────────────────────
@@ -200,6 +204,67 @@ async def extract_pdf_robust(file_bytes: bytes) -> PDFExtractionResult:
     best = max(results, key=lambda x: x[4])
     engine, text, tables, is_index, quality = best
     logger.info(f"PDF extraction: engine={engine} quality={quality:.2f} is_index={is_index}")
+
+    # Determine if we need to fall back to OCR
+    ocr_extractor = OCRExtractor()
+    is_scanned = ocr_extractor.is_scanned_pdf(file_bytes)
+    
+    # If the text is empty/garbled or is heuristically detected as scanned, trigger OCR
+    if is_scanned or quality < settings.ocr_tesseract_min_confidence or len(text.strip()) < 100:
+        logger.info(f"Scanned PDF or low quality detected (is_scanned={is_scanned}, quality={quality:.2f}, text_len={len(text.strip())}). Triggering OCR Fallback...")
+        try:
+            ocr_result = ocr_extractor.extract_text(file_bytes)
+            return PDFExtractionResult(
+                text=ocr_result["text"],
+                tables=ocr_result["tables"],
+                is_index_page=is_index or _detect_index_page(ocr_result["text"]),
+                confidence=ocr_result["confidence"],
+                engine_used=ocr_result["engine_used"],
+                ocr_metadata=ocr_result,
+                flagged_for_manual_review=False
+            )
+        except LowConfidenceException as e:
+            logger.warning(f"OCR succeeded but confidence was below threshold: {e}")
+            ocr_res = e.ocr_result
+            return PDFExtractionResult(
+                text=ocr_res.get("text", ""),
+                tables=ocr_res.get("tables", []),
+                is_index_page=is_index or _detect_index_page(ocr_res.get("text", "")),
+                confidence=ocr_res.get("confidence", 0.0),
+                engine_used=ocr_res.get("engine_used", "none"),
+                ocr_metadata=ocr_res,
+                flagged_for_manual_review=True
+            )
+        except OCRException as e:
+            logger.error(f"OCR Extraction Exception: {e}")
+            return PDFExtractionResult(
+                text=text,
+                tables=tables,
+                is_index_page=is_index,
+                confidence=quality,
+                engine_used="failed_ocr",
+                ocr_metadata={
+                    "status": "failed",
+                    "error": str(e),
+                    "engine_used": settings.ocr_engine
+                },
+                flagged_for_manual_review=True
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error during OCR: {e}")
+            return PDFExtractionResult(
+                text=text,
+                tables=tables,
+                is_index_page=is_index,
+                confidence=quality,
+                engine_used="failed_ocr",
+                ocr_metadata={
+                    "status": "failed",
+                    "error": str(e),
+                    "engine_used": settings.ocr_engine
+                },
+                flagged_for_manual_review=True
+            )
 
     return PDFExtractionResult(text, tables, is_index, quality, engine)
 
@@ -351,14 +416,16 @@ def parse_clauses(text: str) -> List[Clause]:
 async def process_circular(
     file_bytes: bytes, filename: str
 ) -> tuple:
-    """Extract, parse, embed. Returns (status, clauses, duration_ms, confidence, full_text)."""
+    """Extract, parse, embed. Returns (status, clauses, duration_ms, confidence, full_text, ocr_metadata, flagged_for_manual_review)."""
     start = time.time()
     ext = filename.rsplit(".", 1)[-1].lower()
 
     text = ""
     is_index = False
-    tables: List[List[List[str]]] = []
+    tables: List[Any] = []
     confidence = 1.0
+    ocr_metadata = None
+    flagged_for_manual_review = False
 
     if ext == "pdf":
         res = await extract_pdf_robust(file_bytes)
@@ -366,6 +433,8 @@ async def process_circular(
         is_index = res.is_index_page
         tables = res.tables
         confidence = res.confidence
+        ocr_metadata = res.ocr_metadata
+        flagged_for_manual_review = res.flagged_for_manual_review
     elif ext == "docx":
         doc = Document(io.BytesIO(file_bytes))
         text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
@@ -413,4 +482,4 @@ async def process_circular(
         )
 
     duration_ms = int((time.time() - start) * 1000)
-    return status, clauses, duration_ms, confidence, text
+    return status, clauses, duration_ms, confidence, text, ocr_metadata, flagged_for_manual_review

@@ -19,6 +19,26 @@ class Settings(BaseSettings):
     embedding_model: str = "all-MiniLM-L6-v2"
     demo_mode: bool = False  # Set DEMO_MODE=true in .env for hackathon judge demos only
 
+    # OCR Configurations
+    ocr_engine: str = "auto"
+    ocr_cloud_provider: str = "aws"
+    
+    aws_textract_region: str | None = None
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    
+    ocr_tesseract_min_confidence: float = 0.60
+    ocr_cloud_min_confidence: float = 0.75
+    
+    ocr_max_pages: int = 200
+    ocr_large_doc_sample_rate: int = 5
+    
+    ocr_dpi: int = 300
+    ocr_parallel_workers: int = 4
+    
+    ocr_retry_attempts: int = 3
+    ocr_retry_backoff: int = 2
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     def get_cors_origins(self) -> List[str]:
