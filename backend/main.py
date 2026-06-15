@@ -7,8 +7,8 @@ from contextlib import asynccontextmanager
 
 from config import settings
 from database import connect_to_mongo, close_mongo_connection, db
-from api import auth, circulars, gaps, maps, dept, validation, audit, admin, policies, evidence, cve, assets, incidents
-from api import debug as debug_router_module
+from api import auth, circulars, gaps, policies
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="SuRaksha MAPS v4.0 API",
-    description="Backend API for Multi-Agent Persistent Security Framework — Canara Bank Hackathon 2.0",
+    description="Backend API for Compliance Gap Detection Framework",
     version="4.0.0",
     lifespan=lifespan,
 )
@@ -43,17 +43,13 @@ app.add_middleware(
 app.include_router(auth.router,       prefix="/api/auth",      tags=["Authentication"])
 app.include_router(circulars.router,  prefix="/api/circulars", tags=["Watcher Circulars"])
 app.include_router(gaps.router,       prefix="/api/gaps",      tags=["Gap Detection"])
-app.include_router(maps.router,       prefix="/api/maps",      tags=["MAP Generator"])
-app.include_router(dept.router)
-app.include_router(validation.router)
-app.include_router(evidence.router)
-app.include_router(audit.router)
-app.include_router(admin.router,      prefix="/api/admin",     tags=["Admin"])
 app.include_router(policies.router,   prefix="/api/admin/policies", tags=["Policies"])
-app.include_router(cve.router)
-app.include_router(assets.router)
-app.include_router(incidents.router)
-app.include_router(debug_router_module.router, prefix="/api",  tags=["Debug"])
+app.include_router(auth.admin_router, prefix="/api",           tags=["Admin Users"])
+
+
+
+
+
 
 # Serve uploaded proof files
 _upload_dir = os.path.join(os.path.dirname(__file__), "uploads")

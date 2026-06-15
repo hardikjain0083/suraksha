@@ -80,9 +80,9 @@ export const LoginPage = () => {
       setSessionHealth(data.access_level);
 
       const role = data.user?.role ?? '';
-      let defaultRedirect = '/admin/circulars';
-      if (role === 'employee' || role === 'department_head') defaultRedirect = '/dept';
-      else if (role === 'admin') defaultRedirect = '/admin';
+      let defaultRedirect = '/admin';
+      if (role === 'employee') defaultRedirect = '/employee/dashboard';
+      else if (role === 'department_head' || role === 'dept_head') defaultRedirect = '/dept';
       else if (role === 'auditor') defaultRedirect = '/audit';
 
       const redirect = new URLSearchParams(location.search).get('redirect') || defaultRedirect;

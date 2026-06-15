@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     embedding_model: str = "all-MiniLM-L6-v2"
     demo_mode: bool = False  # Set DEMO_MODE=true in .env for hackathon judge demos only
+    gemini_api_key: str | None = None
 
     # OCR Configurations
     ocr_engine: str = "auto"
@@ -61,3 +62,21 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+BANK_PROFILE = {
+    "entity_type": "scheduled_commercial_bank",  # e.g., 'scheduled_commercial_bank', 'rrb', 'ucb', 'sfb', 'nbfc'
+    "asset_size_inr_crore": 15000,
+    "is_d_sib": False,
+    "has_ad_category1_license": True,
+}
+
+CIRCULAR_PREFIX_MAP = {
+    "DBOD": {"dept_hint": ["Operations", "Compliance"], "category": "Banking Operations"},
+    "DOR.STR.REC": {"dept_hint": ["Risk Management", "Compliance"], "category": "Prudential Regulation"},
+    "DOR.STR": {"dept_hint": ["Risk Management", "Compliance"], "category": "Prudential Regulation"},
+    "DOR.ACC": {"dept_hint": ["Finance"], "category": "Accounting"},
+    "DoR.FIN": {"dept_hint": ["Finance"], "category": "Financial Regulation"},
+    "DPSS": {"dept_hint": ["IT Security", "Operations"], "category": "Payments"},
+    "FEMA": {"dept_hint": ["Treasury", "Operations"], "category": "Foreign Exchange"},
+}
+

@@ -5,12 +5,21 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../lib/api';
 
 const DEPARTMENTS = [
-  { id: 'DEPT-INFOSEC', name: 'Information Security' },
-  { id: 'DEPT-IT',      name: 'Information Technology' },
-  { id: 'DEPT-LEGAL',   name: 'Legal & Compliance' },
-  { id: 'DEPT-OPS',     name: 'Banking Operations' },
-  { id: 'DEPT-RISK',    name: 'Risk Management' },
-  { id: 'DEPT-COMP',    name: 'Regulatory Compliance' },
+  { id: 'DEPT-COMPLIANCE', name: 'Compliance' },
+  { id: 'DEPT-LEGAL', name: 'Legal' },
+  { id: 'DEPT-RISK', name: 'Risk' },
+  { id: 'DEPT-OPS', name: 'Operations' },
+  { id: 'DEPT-BRANCH-BANKING', name: 'Branch Banking' },
+  { id: 'DEPT-IT-CYBER', name: 'IT / Cybersecurity' },
+  { id: 'DEPT-FINANCE', name: 'Finance / Accounts' },
+  { id: 'DEPT-HR', name: 'HR' },
+  { id: 'DEPT-RECOVERY', name: 'Recovery / Collections' },
+  { id: 'DEPT-TREASURY', name: 'Treasury' },
+  { id: 'DEPT-SME-CREDIT', name: 'SME / Retail / Credit' },
+  { id: 'DEPT-SECURITY-VIGILANCE', name: 'Security / Vigilance' },
+  { id: 'DEPT-CUSTOMER-SERVICE', name: 'Customer Service' },
+  { id: 'DEPT-MIS', name: 'MIS / Reporting' },
+  { id: 'DEPT-AUDIT', name: 'Audit / Inspection' }
 ];
 
 function passwordStrength(pass: string): number {
@@ -32,7 +41,7 @@ export const RegistrationPage = () => {
     full_name: '',
     email: '',
     mobile: '',
-    department: 'DEPT-INFOSEC',
+    department: 'DEPT-COMPLIANCE',
     designation: '',
     password: '',
   });
@@ -52,8 +61,8 @@ export const RegistrationPage = () => {
     e.preventDefault();
     setError('');
 
-    if (strength < 3) {
-      setError('Password is too weak. Use uppercase, number, and special character.');
+    if (strength < 4) {
+      setError('Password is too weak. Use at least 8 characters, uppercase, number, and special character.');
       return;
     }
 
@@ -169,7 +178,7 @@ export const RegistrationPage = () => {
               required
               value={formData.department}
               onChange={(e) => set('department', e.target.value)}
-              className="w-full p-2.5 text-sm bg-background border rounded-md focus:ring-1 focus:ring-canara-blue outline-none"
+              className="w-full p-2.5 text-sm bg-white text-gray-900 border rounded-md focus:ring-1 focus:ring-canara-blue outline-none"
             >
               {DEPARTMENTS.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>

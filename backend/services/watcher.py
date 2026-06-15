@@ -19,6 +19,115 @@ from services.ocr_extractor import OCRExtractor, OCRException, LowConfidenceExce
 
 logger = logging.getLogger(__name__)
 
+from config import settings, BANK_PROFILE, CIRCULAR_PREFIX_MAP
+from services.precedent_tracker import resolve_precedent_chain
+
+def parse_structured_blocks(page_text: str, page_num: int) -> List[dict]:
+    blocks = []
+    paragraphs = [p.strip() for p in page_text.split("\n\n") if p.strip()]
+    for p in paragraphs:
+        lines = p.split("\n")
+        first_line = lines[0].strip() if lines else ""
+        
+        is_table = False
+        if "|" in p or p.count("\t") > 3 or (len(re.findall(r"\d+", p)) > 8 and len(p) < 400):
+            is_table = True
+            
+        is_annexure = False
+        if re.search(r"\b(annex|annexure|appendix)\b", first_line, re.IGNORECASE):
+            is_annexure = True
+            
+        heading_level = 0
+        section_type = "body"
+        if re.match(r"^((?:\d+\.)+(?:\d+)?|\d+\.|\([a-zA-Z0-9]{1,3}\))\s+[A-Z]", first_line):
+            heading_level = len(re.match(r"^((?:\d+\.)+(?:\d+)?|\d+\.)", first_line).group(1).split(".")) if re.match(r"^((?:\d+\.)+(?:\d+)?|\d+\.)", first_line) else 1
+            section_type = "heading"
+        elif re.match(r"^(section|part|chapter|annexure)\s+[a-zA-Z0-9\-\.]+", first_line, re.IGNORECASE):
+            heading_level = 1
+            section_type = "heading"
+            
+        blocks.append({
+            "page_number": page_num,
+            "section_type": section_type,
+            "text_content": p,
+            "heading_level": heading_level,
+            "is_annexure": is_annexure,
+            "is_table": is_table
+        })
+    return blocks
+
+def classify_circular_intent(full_text: str) -> str:
+    sample = full_text[:2000].lower()
+    mandatory_keywords = ["shall", "must", "are directed to", "it is mandatory", "with immediate effect", "compliance required by"]
+    advisory_keywords = ["may consider", "is advised to", "should", "encouraged to"]
+    info_keywords = ["for information", "for kind attention", "circular is forwarded", "no action required"]
+    
+    if any(kw in sample for kw in mandatory_keywords):
+        return "mandatory"
+    if any(kw in sample for kw in info_keywords):
+        return "information_only"
+    if any(kw in sample for kw in advisory_keywords):
+        return "advisory"
+    return "mandatory"
+
+def check_bank_applicability(full_text: str, profile: dict) -> tuple[bool, List[str]]:
+    text_lower = full_text.lower()
+    entity_type = profile.get("entity_type", "scheduled_commercial_bank")
+    conditions = []
+    
+    # Trace D-SIB
+    if "domestic systemically important bank" in text_lower or "d-sib" in text_lower:
+        conditions.append("d-sib specific")
+        if not profile.get("is_d_sib", False):
+            return False, conditions
+            
+    # Trace RRB
+    if "regional rural banks" in text_lower or "rrb" in text_lower:
+        if "excluding rrb" in text_lower or "excluding regional rural banks" in text_lower:
+            conditions.append("excl rrb")
+            if entity_type == "rrb":
+                return False, conditions
+        if "for regional rural banks only" in text_lower or "only to rrb" in text_lower:
+            conditions.append("rrb only")
+            if entity_type != "rrb":
+                return False, conditions
+                
+    # Cooperative
+    if "urban cooperative banks" in text_lower or "ucb" in text_lower or "cooperative banks" in text_lower:
+        conditions.append("cooperative context")
+        if "cooperative banks only" in text_lower or "for cooperative banks" in text_lower:
+            if entity_type not in ("ucb", "cooperative"):
+                return False, conditions
+                
+    # SFB
+    if "small finance banks" in text_lower or "sfb" in text_lower:
+        conditions.append("sfb context")
+        if "small finance banks only" in text_lower or "for small finance banks" in text_lower:
+            if entity_type != "sfb":
+                return False, conditions
+                
+    # NBFC
+    if "nbfc" in text_lower or "non-banking financial" in text_lower:
+        conditions.append("nbfc context")
+        if "nbfc only" in text_lower or "for nbfcs" in text_lower:
+            if entity_type != "nbfc":
+                return False, conditions
+        asset_match = re.search(r"asset size of\s*₹?\s*(\d+)\s*(crore|cr)", text_lower)
+        if asset_match:
+            required_size = int(asset_match.group(1))
+            conditions.append(f"nbfc asset threshold: {required_size} cr")
+            if profile.get("asset_size_inr_crore", 0) < required_size:
+                return False, conditions
+                
+    return True, conditions
+
+def extract_circular_number(text: str, filename: str) -> str:
+    pattern = r"\b((?:DBOD|DOR|DIT|DPSS|FEMA|RPCD|FIDD|DoS|DNBS|DNBR|IDMD|DOR\.STR\.REC|DoR\.FIN\.REC)(?:\.[A-Za-z0-9]+)*\.No\.[A-Za-z0-9\-\.\/]+)\b"
+    match = re.search(pattern, text)
+    if match:
+        return match.group(1).strip()
+    return filename.rsplit(".", 1)[0]
+
 # ─────────────────────────────────────────────────────────────
 #  Embedder (lazy-loaded)
 # ─────────────────────────────────────────────────────────────
@@ -32,7 +141,13 @@ def get_embedder():
     if _embedder is None and not _use_mock:
         try:
             from sentence_transformers import SentenceTransformer
-            _embedder = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+            try:
+                _embedder = SentenceTransformer("all-MiniLM-L6-v2", model_kwargs={"local_files_only": True})
+            except Exception:
+                try:
+                    _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+                except Exception as ex:
+                    raise ex
             logger.info("SentenceTransformer loaded successfully.")
         except Exception as e:
             logger.warning(f"Failed to load local sentence_transformers model: {e}. Using deterministic fallback embeddings.")
@@ -416,7 +531,7 @@ def parse_clauses(text: str) -> List[Clause]:
 async def process_circular(
     file_bytes: bytes, filename: str
 ) -> tuple:
-    """Extract, parse, embed. Returns (status, clauses, duration_ms, confidence, full_text, ocr_metadata, flagged_for_manual_review)."""
+    """Extract, parse, embed. Returns (status, clauses, duration_ms, confidence, full_text, ocr_metadata, flagged_for_manual_review, intent, is_master_circular, supersedes_circulars, applicability_conditions, structured_blocks)."""
     start = time.time()
     ext = filename.rsplit(".", 1)[-1].lower()
 
@@ -426,34 +541,96 @@ async def process_circular(
     confidence = 1.0
     ocr_metadata = None
     flagged_for_manual_review = False
+    structured_blocks = []
 
     if ext == "pdf":
-        res = await extract_pdf_robust(file_bytes)
-        text = res.text
-        is_index = res.is_index_page
-        tables = res.tables
-        confidence = res.confidence
-        ocr_metadata = res.ocr_metadata
-        flagged_for_manual_review = res.flagged_for_manual_review
+        try:
+            import fitz
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            clauses = []
+            text = ""
+            for page_idx, page in enumerate(doc):
+                page_text = page.get_text()
+                page_text_clean = _clean_rbi_text(page_text)
+                text += page_text_clean + "\n"
+                page_clauses = parse_clauses(page_text_clean)
+                for c in page_clauses:
+                    c.page_number = page_idx + 1
+                clauses.extend(page_clauses)
+                structured_blocks.extend(parse_structured_blocks(page_text_clean, page_idx + 1))
+            doc.close()
+            
+            if not clauses:
+                res = await extract_pdf_robust(file_bytes)
+                text = res.text
+                is_index = res.is_index_page
+                tables = res.tables
+                confidence = res.confidence
+                ocr_metadata = res.ocr_metadata
+                flagged_for_manual_review = res.flagged_for_manual_review
+                structured_blocks = parse_structured_blocks(text, 1)
+                if is_index:
+                    clauses = parse_clauses_from_index(tables) if tables else []
+                    if not clauses:
+                        clauses = parse_index_from_text(text)
+                    if not clauses:
+                        clauses = parse_clauses(text)
+                else:
+                    clauses = parse_clauses(text)
+                for c in clauses:
+                    c.page_number = 1
+            else:
+                is_index = False
+                confidence = 1.0
+        except Exception as e:
+            logger.error(f"PyMuPDF page-by-page failed: {e}")
+            res = await extract_pdf_robust(file_bytes)
+            text = res.text
+            is_index = res.is_index_page
+            tables = res.tables
+            confidence = res.confidence
+            ocr_metadata = res.ocr_metadata
+            flagged_for_manual_review = res.flagged_for_manual_review
+            structured_blocks = parse_structured_blocks(text, 1)
+            if is_index:
+                clauses = parse_clauses_from_index(tables) if tables else []
+                if not clauses:
+                    clauses = parse_index_from_text(text)
+                if not clauses:
+                    clauses = parse_clauses(text)
+            else:
+                clauses = parse_clauses(text)
+            for c in clauses:
+                c.page_number = 1
     elif ext == "docx":
         doc = Document(io.BytesIO(file_bytes))
         text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-    else:
-        # Plain text
-        text = file_bytes.decode("utf-8", errors="ignore")
-
-    # ── Parse clauses ─────────────────────────────────────────
-    if is_index:
-        clauses = parse_clauses_from_index(tables) if tables else []
-        if not clauses:
-            clauses = parse_index_from_text(text)
-        if not clauses:
-            clauses = parse_clauses(text)
-    else:
         clauses = parse_clauses(text)
+        structured_blocks = parse_structured_blocks(text, 1)
+        for c in clauses:
+            c.page_number = 1
+    else:
+        text = file_bytes.decode("utf-8", errors="ignore")
+        clauses = parse_clauses(text)
+        structured_blocks = parse_structured_blocks(text, 1)
+        for c in clauses:
+            c.page_number = 1
+
+    # ── Detect intent and applicability ──────────────────────
+    intent = classify_circular_intent(text)
+    is_applicable, applicability_conditions = check_bank_applicability(text, BANK_PROFILE)
+    
+    is_master_circular = "master circular" in text.lower() or "consolidated guidelines" in text.lower() or "supersedes the following circulars" in text.lower()
+    
+    from services.precedent_tracker import extract_circular_references
+    supersedes_circulars = extract_circular_references(text) if is_master_circular else []
 
     # ── Determine ingestion status ────────────────────────────
-    if not clauses:
+    if not is_applicable:
+        status = "not_applicable"
+    elif intent == "information_only":
+        status = "no_action_required"
+    elif not clauses:
         status = "failed"
     elif is_index:
         status = "fully_parsed"
@@ -482,4 +659,4 @@ async def process_circular(
         )
 
     duration_ms = int((time.time() - start) * 1000)
-    return status, clauses, duration_ms, confidence, text, ocr_metadata, flagged_for_manual_review
+    return status, clauses, duration_ms, confidence, text, ocr_metadata, flagged_for_manual_review, intent, is_master_circular, supersedes_circulars, applicability_conditions, structured_blocks

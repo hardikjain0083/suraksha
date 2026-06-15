@@ -29,45 +29,18 @@ const t = (s: string) => s;
 
 const adminNavGroups = [
   {
-    title: 'Core Command',
+    title: 'System Control',
     items: [
-      { to: '/admin', icon: Shield, label: 'Dashboard', exact: true },
-      { to: '/admin/users', icon: Users, label: 'User Control' },
-      { to: '/admin/circulars', icon: FileText, label: 'Circular Repository' },
-    ]
-  },
-  {
-    title: 'AI Compliance Intel',
-    items: [
-      { to: '/admin/gaps', icon: Search, label: 'Gap Detection' },
-      { to: '/admin/gaps/queue', icon: CheckSquare, label: 'Triage Queue' },
-      { to: '/admin/validation', icon: Zap, label: 'Evidence Validation' },
-    ]
-  },
-  {
-    title: 'Cyber Orchestration',
-    items: [
-      { to: '/admin/incidents', icon: ShieldAlert, label: 'Incident Desk' },
-      { to: '/admin/mttr', icon: BarChart3, label: 'MTTR Tracking' },
-    ]
-  },
-  {
-    title: 'Workflow & Ledger',
-    items: [
-      { to: '/admin/triage', icon: Scale, label: 'MAP Triage' },
-      { to: '/admin/maps', icon: Map, label: 'MAP Repository' },
-      { to: '/audit/logs', icon: Clock, label: 'Audit Logs' },
+      { to: '/admin', icon: Shield, label: 'Admin Dashboard', exact: true },
     ]
   }
 ];
 
-const auditorNavGroups = [
+const deptHeadNavGroups = [
   {
-    title: 'Audit & Ledger',
+    title: 'Department Head',
     items: [
-      { to: '/audit', icon: BarChart3, label: 'Audit Portal', exact: true },
-      { to: '/audit/logs', icon: Clock, label: 'Audit Logs' },
-      { to: '/admin/maps', icon: Layers, label: 'MAP Inspector' },
+      { to: '/dept/dashboard', icon: Layers, label: 'Department Gaps', exact: true },
     ]
   }
 ];
@@ -76,11 +49,11 @@ const employeeNavGroups = [
   {
     title: 'Task Center',
     items: [
-      { to: '/employee/dashboard', icon: CheckSquare, label: 'My Tasks', exact: true },
-      { to: '/dept', icon: Layers, label: 'Department Portal' },
+      { to: '/employee/dashboard', icon: CheckSquare, label: 'My Gaps', exact: true },
     ]
   }
 ];
+
 
 // ─── Role badge colours ──────────────────────────────────────────────────────
 const roleBadge: Record<string, string> = {
@@ -135,7 +108,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isAuthOrHome) {
     return (
-      <div className="flex flex-col min-h-screen bg-obsidian-900 overflow-y-auto relative font-sans text-foreground">
+      <div className="flex flex-col h-screen bg-obsidian-900 overflow-y-auto relative font-sans text-foreground">
         {/* Subtle matrix-grid aesthetic background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293710_1px,transparent_1px),linear-gradient(to_bottom,#1f293710_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
         
@@ -175,8 +148,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Pick navigation items based on role
   let navGroups = adminNavGroups;
-  if (isEmployee) navGroups = employeeNavGroups;
-  else if (isAuditor) navGroups = auditorNavGroups;
+  if (user?.role === 'employee') {
+    navGroups = employeeNavGroups;
+  } else if (user?.role === 'dept_head' || user?.role === 'department_head') {
+    navGroups = deptHeadNavGroups;
+  }
+
 
   const role = user?.role ?? 'compliance_officer';
   const badgeClass = roleBadge[role] ?? 'bg-slate-800/30 text-slate-400 border border-slate-700/50';

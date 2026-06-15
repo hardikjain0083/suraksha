@@ -10,10 +10,6 @@ export const CircularBoardPage = () => {
   const [stats, setStats] = useState({ total: 0, fully_parsed: 0 });
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchCirculars();
-  }, []);
-
   const fetchCirculars = async () => {
     try {
       const res = await apiClient.get('/api/circulars');
@@ -23,6 +19,11 @@ export const CircularBoardPage = () => {
       if (import.meta.env.DEV) console.error(error);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCirculars();
+  }, []);
 
   const filteredCirculars = circulars.filter(c => 
     c.title.toLowerCase().includes(searchTerm.toLowerCase()) || 

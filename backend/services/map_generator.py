@@ -313,22 +313,14 @@ async def generate_map_from_gap(
         database, gap["circular_id"], gap.get("clause_number")
     )
     clause_text = gap.get("clause_text") or circular_ctx["clause_text"]
-    category = _detect_clause_category(clause_text)
     policy_id = gap.get("top_policy_id")
     policy_title = gap.get("top_policy_title")
 
-    dept_id, dept_name = await resolve_department_graph_lookup(
-        database, gap, policy_id, category
-    )
-
     title = generate_title_from_clause(clause_text)
     description = generate_description(clause_text, circular_ctx["title"], policy_title)
-    
+
     # SLA-driven dynamic deadlines
     sev_lower = (gap.get("severity") or "medium").lower()
-    is_certin = circular_ctx.get("issuer") == "CERT-In"
-    map_type = "security" if (is_certin or category in ("cryptography", "authentication", "network_security", "cybersecurity") or sev_lower in ("critical", "high")) else "operational"
-    
     if sev_lower == "critical":
         sla_days = 3
     elif sev_lower == "high":
@@ -336,22 +328,71 @@ async def generate_map_from_gap(
     elif sev_lower == "medium":
         sla_days = 15
     else:
-        sla_days = 30
-        
+        sla_days = 45
+
     deadline = datetime.utcnow() + timedelta(days=sla_days)
-    suggested = suggest_evidence_types(category)
-    evidence_items = build_evidence_items(suggested)
 
     similar_refs, hist_count = await find_similar_historical_maps(database, clause_text)
     if gap.get("historical_match_count") is not None:
         hist_count = max(hist_count, gap["historical_match_count"])
 
-    is_historical = gap.get("routing") == "auto_routed" or hist_count >= 3
-    confidence = min(0.99, 0.5 + (hist_count * 0.1) + (gap.get("similarity_score") or 0) * 0.3)
-    risk = severity_to_risk(gap.get("severity"), gap.get("gap_status", "confirmed"))
     priority = calculate_priority_score(
         gap.get("severity", "medium"), deadline, circular_ctx.get("issuer")
     )
+
+    # Fetch circular content for prompt context
+    circ_doc = await database.circulars.find_one({"circular_id": gap["circular_id"]})
+    circ_content = circ_doc.get("content", "") if circ_doc else ""
+
+    from services.ai_service import classify_department, select_employee_for_map, generate_evidence_template
+    from services.audit_logger import append_audit_log
+
+    # 1. Classify Department using Gemini Classification Agent
+    class_res = await classify_department(
+        gap_description=gap.get("gap_description") or clause_text,
+        circular_title=circular_ctx["title"],
+        circular_content=circ_content
+    )
+
+    dept_id = class_res["department_id"]
+    confidence = class_res["confidence_score"]
+    reasoning = class_res["reasoning"]
+    multi_dept = class_res["multi_department"]
+    affected_depts = class_res["affected_departments"]
+
+    # If confidence score < 0.80, set status to pending_admin_assignment
+    is_low_conf = confidence < 0.80
+
+    # Get department details
+    dept = await database.departments.find_one({"department_id": dept_id})
+    dept_name = dept.get("name", "Compliance") if dept else "Compliance"
+
+    # Common fields for map document
+    category = _detect_clause_category(clause_text)
+    suggested = suggest_evidence_types(category)
+
+    def get_file_type(s_type: str) -> str:
+        s_lower = s_type.lower()
+        if "config" in s_lower or "file" in s_lower or "document" in s_lower:
+            return "docx"
+        elif "screenshot" in s_lower or "image" in s_lower:
+            return "image"
+        return "pdf"
+
+    def build_custom_evidence_items():
+        items = []
+        for s in suggested:
+            items.append({
+                "evidence_id": f"ev_{uuid.uuid4().hex[:10]}",
+                "file_url": "",
+                "file_type": get_file_type(s["type"]),
+                "uploaded_at": None,
+                "uploaded_by": "",
+                "description": s["label"],
+                "validation_status": "pending",
+                "validation_notes": ""
+            })
+        return items
 
     provenance = build_provenance_path(
         gap["circular_id"],
@@ -366,29 +407,8 @@ async def generate_map_from_gap(
         dept_name,
     )
 
-    # CISO Escalation Check
-    ciso_escalated = False
-    escalation_reason = None
-    
-    if map_type == "security" and sev_lower in ("critical", "high"):
-        # Extract CVEs from clause text
-        cves = re.findall(r"\b(CVE-\d{4}-\d{4,7})\b", clause_text, re.IGNORECASE)
-        from services.threat_mapper import correlate_advisory_to_assets
-        correlated = await correlate_advisory_to_assets(
-            database=database,
-            cves=cves,
-            systems_affected=[category],
-            full_text=clause_text
-        )
-        # If any correlated asset has critical sensitivity or sensitive customer data category, escalate
-        for asset in correlated:
-            if asset.get("sensitivity") == "critical" or asset.get("category") == "sensitive_customer_data":
-                ciso_escalated = True
-                escalation_reason = f"Critical threat affecting sensitive asset: {asset.get('name')} ({asset.get('asset_id')})"
-                break
-
-    status = "escalated" if ciso_escalated else ("approved" if is_historical else "draft")
-    map_id = f"MAP-{uuid.uuid4().hex[:8].upper()}"
+    now = datetime.utcnow()
+    risk = severity_to_risk(gap.get("severity"), gap.get("gap_status", "confirmed"))
 
     requirements = [
         f"Implement controls per clause {gap.get('clause_number', 'N/A')}",
@@ -396,75 +416,252 @@ async def generate_map_from_gap(
         f"Coordinate with {dept_name} for sign-off",
     ]
 
-    now = datetime.utcnow()
-    map_doc = {
-        "map_id": map_id,
+    base_map_doc = {
         "gap_id": gap_id,
         "circular_id": gap["circular_id"],
         "policy_id": policy_id or "UNASSIGNED",
         "title": title,
         "description": description,
         "requirements": requirements,
-        "status": status,
-        "owner_department_id": dept_id,
-        "department_name": dept_name,
-        "assigned_to": None,
         "deadline": deadline,
         "priority_score": priority,
         "risk_level": risk,
-        "provenance_path": provenance,
-        "evidence_items": evidence_items,
         "clause_text": clause_text,
         "historical_match_count": hist_count,
-        "confidence_score": round(confidence, 2),
-        "is_historical_match": is_historical,
         "similar_past_maps": [r.model_dump() for r in similar_refs],
-        "map_type": map_type,
-        "ciso_escalated": ciso_escalated,
-        "escalation_reason": escalation_reason,
-        "audit_trail": [
-            {
+        "created_at": now,
+        "issuer": circular_ctx.get("issuer"),
+        "routing_source": gap.get("routing", "pending_review"),
+        "provenance_path": provenance,
+    }
+
+    created_maps = []
+
+    # If low confidence
+    if is_low_conf:
+        # Create single MAP for manual admin triage
+        map_id = f"MAP-{uuid.uuid4().hex[:8].upper()}"
+        map_doc = {
+            **base_map_doc,
+            "map_id": map_id,
+            "master_map_id": None,
+            "owner_department_id": dept_id,
+            "department_name": dept_name,
+            "assigned_to": None,
+            "assigned_by_ai": False,
+            "assignment_confidence": confidence,
+            "assignment_reason": f"AI flagged low confidence: {reasoning}",
+            "ai_flagged_low_confidence": True,
+            "status": "pending_admin_assignment",
+            "evidence_items": build_custom_evidence_items(),
+            "audit_trail": [{
                 "timestamp": now,
                 "user_id": officer_id,
                 "user_name": officer_name,
-                "action": "map_generated",
-                "details": f"Generated from gap {gap_id} ({'auto-routed' if is_historical else 'pending review'})",
+                "action": "ai_flagged_low_confidence",
+                "details": f"Flagged for admin manual assignment due to low confidence ({confidence:.2f})"
+            }],
+            "timeline": build_timeline("pending_admin_assignment", now)
+        }
+        await database.maps.insert_one(map_doc)
+        created_maps.append(map_doc)
+        
+        # Log audit entry
+        await append_audit_log(
+            database,
+            action_type="ai_low_confidence_flagged",
+            target_type="map",
+            target_id=map_id,
+            user_id="system",
+            user_name="AI Classification Agent",
+            details={"confidence": confidence, "reasoning": reasoning}
+        )
+    else:
+        # Check if cross-department MAP
+        if multi_dept and affected_depts:
+            # Create Master MAP first
+            master_map_id = f"MMAP-{uuid.uuid4().hex[:8].upper()}"
+            await database.master_maps.insert_one({
+                "master_map_id": master_map_id,
+                "circular_id": gap["circular_id"],
+                "title": f"Master MAP: {title}",
+                "overall_status": "open",
+                "linked_circular_ids": [gap["circular_id"]],
+                "created_at": now
+            })
+
+            # Create Sub-MAP for main department
+            main_sub_id = f"MAP-{uuid.uuid4().hex[:8].upper()}"
+            main_assignee, main_assign_reason = await select_employee_for_map(
+                database=database,
+                department_id=dept_id,
+                gap_description=clause_text,
+                gap_tags=[category]
+            )
+            
+            # If no employee found, set status to pending_admin_assignment
+            main_status = "pending_head_review" if main_assignee else "pending_admin_assignment"
+            main_evidence = build_custom_evidence_items()
+            
+            main_sub_doc = {
+                **base_map_doc,
+                "map_id": main_sub_id,
+                "master_map_id": master_map_id,
+                "owner_department_id": dept_id,
+                "department_name": dept_name,
+                "assigned_to": main_assignee,
+                "assigned_by_ai": True,
+                "assignment_confidence": confidence,
+                "assignment_reason": main_assign_reason,
+                "ai_flagged_low_confidence": False,
+                "status": main_status,
+                "evidence_items": main_evidence,
+                "audit_trail": [{
+                    "timestamp": now,
+                    "user_id": officer_id,
+                    "user_name": officer_name,
+                    "action": "sub_map_created",
+                    "details": f"Sub-MAP created under master {master_map_id}. Route assignee: {main_assignee}"
+                }],
+                "timeline": build_timeline(main_status, now)
             }
-        ],
-        "timeline": build_timeline(status, now, now if status == "approved" else None),
-        "issuer": circular_ctx.get("issuer"),
-        "created_at": now,
-        "approved_at": now if status == "approved" else None,
-        "routing_source": gap.get("routing", "pending_review"),
-    }
+            await database.maps.insert_one(main_sub_doc)
+            created_maps.append(main_sub_doc)
 
-    await database.maps.insert_one(map_doc)
+            # Generate and insert evidence template
+            if main_assignee:
+                tpl_content = await generate_evidence_template(category, clause_text)
+                await database.evidence_templates.insert_one({
+                    "template_id": f"TPL-{uuid.uuid4().hex[:8].upper()}",
+                    "map_id": main_sub_id,
+                    "gap_type": category,
+                    "template_content": tpl_content,
+                    "generated_by_ai": True,
+                    "created_at": now
+                })
 
-    if ciso_escalated:
-        from services.notification import send_notification
-        await send_notification(
-            user_id="EMP-INFOSEC-001",
-            subject="CRITICAL ESCALATION: Sensitive System Exposed",
-            message=f"Critical threat affecting sensitive customer-data system has been escalated. MAP ID: {map_id}. Reason: {escalation_reason}"
+            # Create Sub-MAPs for affected departments
+            for affected in affected_depts:
+                aff_dept_id = affected["department_id"]
+                aff_dept = await database.departments.find_one({"department_id": aff_dept_id})
+                aff_dept_name = aff_dept.get("name", "Department") if aff_dept else "Department"
+
+                sub_map_id = f"MAP-{uuid.uuid4().hex[:8].upper()}"
+                aff_assignee, aff_assign_reason = await select_employee_for_map(
+                    database=database,
+                    department_id=aff_dept_id,
+                    gap_description=clause_text,
+                    gap_tags=[category]
+                )
+                
+                aff_status = "pending_head_review" if aff_assignee else "pending_admin_assignment"
+                
+                sub_doc = {
+                    **base_map_doc,
+                    "map_id": sub_map_id,
+                    "master_map_id": master_map_id,
+                    "owner_department_id": aff_dept_id,
+                    "department_name": aff_dept_name,
+                    "assigned_to": aff_assignee,
+                    "assigned_by_ai": True,
+                    "assignment_confidence": confidence,
+                    "assignment_reason": aff_assign_reason,
+                    "ai_flagged_low_confidence": False,
+                    "status": aff_status,
+                    "evidence_items": build_custom_evidence_items(),
+                    "audit_trail": [{
+                        "timestamp": now,
+                        "user_id": officer_id,
+                        "user_name": officer_name,
+                        "action": "sub_map_created",
+                        "details": f"Sub-MAP created under master {master_map_id} for department {aff_dept_name}."
+                    }],
+                    "timeline": build_timeline(aff_status, now)
+                }
+                await database.maps.insert_one(sub_doc)
+                
+                if aff_assignee:
+                    tpl_content = await generate_evidence_template(category, clause_text)
+                    await database.evidence_templates.insert_one({
+                        "template_id": f"TPL-{uuid.uuid4().hex[:8].upper()}",
+                        "map_id": sub_map_id,
+                        "gap_type": category,
+                        "template_content": tpl_content,
+                        "generated_by_ai": True,
+                        "created_at": now
+                    })
+        else:
+            # Create single normal MAP
+            map_id = f"MAP-{uuid.uuid4().hex[:8].upper()}"
+            assignee, assign_reason = await select_employee_for_map(
+                database=database,
+                department_id=dept_id,
+                gap_description=clause_text,
+                gap_tags=[category]
+            )
+            
+            map_status = "pending_head_review" if assignee else "pending_admin_assignment"
+            
+            map_doc = {
+                **base_map_doc,
+                "map_id": map_id,
+                "master_map_id": None,
+                "owner_department_id": dept_id,
+                "department_name": dept_name,
+                "assigned_to": assignee,
+                "assigned_by_ai": True,
+                "assignment_confidence": confidence,
+                "assignment_reason": assign_reason,
+                "ai_flagged_low_confidence": False,
+                "status": map_status,
+                "evidence_items": build_custom_evidence_items(),
+                "audit_trail": [{
+                    "timestamp": now,
+                    "user_id": officer_id,
+                    "user_name": officer_name,
+                    "action": "map_generated",
+                    "details": f"Generated from gap {gap_id}. Assigned employee: {assignee}"
+                }],
+                "timeline": build_timeline(map_status, now)
+            }
+            await database.maps.insert_one(map_doc)
+            created_maps.append(map_doc)
+
+            # Generate evidence template
+            if assignee:
+                tpl_content = await generate_evidence_template(category, clause_text)
+                await database.evidence_templates.insert_one({
+                    "template_id": f"TPL-{uuid.uuid4().hex[:8].upper()}",
+                    "map_id": map_id,
+                    "gap_type": category,
+                    "template_content": tpl_content,
+                    "generated_by_ai": True,
+                    "created_at": now
+                })
+
+    # Update Gap Queue triage status
+    if created_maps:
+        await database.gap_queue.update_one(
+            {"gap_id": gap_id},
+            {"$set": {"generated_map_id": created_maps[0]["map_id"], "triage_status": "assigned"}}
         )
 
-    await database.gap_queue.update_one(
-        {"gap_id": gap_id},
-        {"$set": {"generated_map_id": map_id, "triage_status": "assigned"}},
-    )
+        # Insert into triage actions
+        await database.triage_actions.insert_one({
+            "action_id": f"ACT-{uuid.uuid4().hex[:8].upper()}",
+            "map_id": created_maps[0]["map_id"],
+            "gap_id": gap_id,
+            "timestamp": now,
+            "officer_id": officer_id,
+            "officer_name": officer_name,
+            "decision": "assigned",
+            "title": title,
+        })
 
-    await database.triage_actions.insert_one({
-        "action_id": f"ACT-{uuid.uuid4().hex[:8].upper()}",
-        "map_id": map_id,
-        "gap_id": gap_id,
-        "timestamp": now,
-        "officer_id": officer_id,
-        "officer_name": officer_name,
-        "decision": "escalated" if ciso_escalated else "generated",
-        "title": title,
-    })
+        return created_maps[0]
+    else:
+        raise ValueError(f"No MAP could be generated for gap: {gap_id}")
 
-    return map_doc
 
 
 async def log_audit(database: Any, map_id: str, user_id: str, user_name: str, action: str, details: str = ""):

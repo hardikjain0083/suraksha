@@ -1,387 +1,1194 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Shield, 
-  Search, 
-  CheckSquare, 
-  Activity, 
-  AlertTriangle, 
-  Terminal as TerminalIcon, 
-  ArrowUpRight, 
+  Upload, 
   FileText, 
+  AlertTriangle, 
+  CheckCircle, 
+  RefreshCw, 
   Layers, 
   Users, 
-  TrendingUp,
-  Cpu
+  Clock, 
+  Check, 
+  ExternalLink,
+  Loader2,
+  Calendar,
+  Settings,
+  Trash2,
+  Archive,
+  ArchiveRestore,
+  Filter,
+  FileSpreadsheet,
+  Layers2,
+  AlertOctagon,
+  Tag
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { GlassCard } from '@/components/ui/glass-card';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
-
-// Mock chart data for compliance trend visualization
-const trendData = [
-  { day: '05-12', compliance: 82, activeGaps: 14 },
-  { day: '05-13', compliance: 84, activeGaps: 12 },
-  { day: '05-14', compliance: 83, activeGaps: 13 },
-  { day: '05-15', compliance: 86, activeGaps: 10 },
-  { day: '05-16', compliance: 89, activeGaps: 8 },
-  { day: '05-17', compliance: 91, activeGaps: 5 },
-  { day: '05-18', compliance: 93, activeGaps: 3 },
-];
-
-const t = (s: string) => s;
 
 export function AdminDashboard() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [terminalFilter, setTerminalFilter] = useState<'all' | 'error' | 'warning' | 'info'>('all');
-  const navigate = useNavigate();
+  // Tabs: 'gaps' | 'upload' | 'approvals' | 'policies' | 'orphans'
+  const [activeTab, setActiveTab] = useState<'gaps' | 'upload' | 'approvals' | 'policies' | 'orphans'>('gaps');
+  
+  // Data states
+  const [gaps, setGaps] = useState<any[]>([]);
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [employeesByDept, setEmployeesByDept] = useState<Record<string, any[]>>({});
+  const [orphanedDirectives, setOrphanedDirectives] = useState<any[]>([]);
+  
+  // Filtering states
+  const [filterDept, setFilterDept] = useState('');
+  const [filterSeverity, setFilterSeverity] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [groupByDay, setGroupByDay] = useState(false);
+  
+  // Selection states (for Bulk Actions)
+  const [selectedGapIds, setSelectedGapIds] = useState<string[]>([]);
+  
+  // Loading & Action states
+  const [loadingGaps, setLoadingGaps] = useState(false);
+  const [loadingPolicies, setLoadingPolicies] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
+  // Upload states
+  const [circularFile, setCircularFile] = useState<File | null>(null);
+  const [uploadingCircular, setUploadingCircular] = useState(false);
+  
+  const [policyFile, setPolicyFile] = useState<File | null>(null);
+  const [policyTitle, setPolicyTitle] = useState('');
+  const [policyDept, setPolicyDept] = useState('DEPT-COMPLIANCE');
+  const [policyVersion, setPolicyVersion] = useState('1.0.0');
+  const [uploadingPolicy, setUploadingPolicy] = useState(false);
+
+  // Message banners
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Reassignment inline modal/state
+  const [reassigningGapId, setReassigningGapId] = useState<string | null>(null);
+  const [selectedNewEmpId, setSelectedNewEmpId] = useState('');
+  
+  // Bulk controls
+  const [bulkHOD, setBulkHOD] = useState('');
+  const [bulkSeverity, setBulkSeverity] = useState('');
+  const [bulkEmployee, setBulkEmployee] = useState('');
+
+  // Manual routing for orphans
+  const [routingOrphanId, setRoutingOrphanId] = useState<string | null>(null);
+  const [orphanRouteDept, setOrphanRouteDept] = useState('DEPT-COMPLIANCE');
+
+  const fetchGaps = async () => {
+    setLoadingGaps(true);
+    try {
+      const res = await apiClient.get('/api/gaps/all');
+      setGaps(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingGaps(false);
+    }
+  };
+
+  const fetchPolicies = async () => {
+    setLoadingPolicies(true);
+    try {
+      const res = await apiClient.get('/api/admin/policies/');
+      setPolicies(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingPolicies(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await apiClient.get('/api/gaps/notifications');
+      setNotifications(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchOrphans = async () => {
+    try {
+      const res = await apiClient.get('/api/gaps/orphaned');
+      setOrphanedDirectives(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Seed list of employees per department for reassign dropdown
+  const seedEmployeeList = async () => {
+    try {
+      const depts = [
+        "DEPT-COMPLIANCE", "DEPT-LEGAL", "DEPT-RISK", "DEPT-OPS", 
+        "DEPT-IT-CYBER", "DEPT-HR", "DEPT-FINANCE", "DEPT-CREDIT"
+      ];
+      const mapping: Record<string, any[]> = {};
+      for (const dId of depts) {
+        const cleanCode = dId.replace("DEPT-", "");
+        mapping[dId] = [
+          { emp_id: `EMP-${cleanCode}-001`, name: `${cleanCode} Officer A` },
+          { emp_id: `EMP-${cleanCode}-002`, name: `${cleanCode} Officer B` },
+          { emp_id: `EMP-${cleanCode}-HEAD`, name: `${cleanCode} Head` }
+        ];
+      }
+      setEmployeesByDept(mapping);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
-    setLoading(true);
-    apiClient.get('/api/admin/dashboard')
-      .then(res => {
-        setData(res.data);
-        setLoading(false);
-      })
-      .catch(err => {
-        if (import.meta.env.DEV) console.error(err);
-        setLoading(false);
-      });
+    fetchGaps();
+    fetchPolicies();
+    fetchNotifications();
+    seedEmployeeList();
+    fetchOrphans();
   }, []);
 
-  if (loading || !data) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)] font-mono text-cyber-cyan gap-4">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-cyber-cyan/20 border-t-cyber-cyan rounded-full animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Shield className="w-6 h-6 animate-pulse" />
-          </div>
-        </div>
-        <p className="animate-pulse tracking-widest text-xs">{t('SYNCHRONIZING SECURE COMMAND MATRIX...')}</p>
-      </div>
-    );
-  }
+  const triggerToast = (msg: string, isError = false) => {
+    if (isError) {
+      setErrorMsg(msg);
+      setTimeout(() => setErrorMsg(''), 4500);
+    } else {
+      setSuccessMsg(msg);
+      setTimeout(() => setSuccessMsg(''), 4500);
+    }
+  };
 
-  // Filter alerts for the cyber terminal screen
-  const filteredAlerts = data.alerts.filter((alert: any) => {
-    if (terminalFilter === 'all') return true;
-    return alert.type === terminalFilter;
-  });
+  const handleUploadCircular = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!circularFile) return;
+    setUploadingCircular(true);
+    const formData = new FormData();
+    formData.append('file', circularFile);
+
+    try {
+      const res = await apiClient.post('/api/circulars/upload', formData, {
+        timeout: 120000,
+      });
+      if (res.data.status === 'duplicate') {
+        triggerToast('Circular already uploaded: Linked as duplicate.', true);
+      } else {
+        const supersededMsg = res.data.superseded_gaps_count > 0 
+          ? ` (superseded ${res.data.superseded_gaps_count} old gaps)` 
+          : '';
+        triggerToast(`RBI Circular ingested successfully! Intent: ${res.data.intent.toUpperCase()}${supersededMsg}. Detected ${res.data.new_gaps_detected} gaps.`);
+        setCircularFile(null);
+        fetchGaps();
+        fetchNotifications();
+        fetchOrphans();
+      }
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Circular upload failed', true);
+    } finally {
+      setUploadingCircular(false);
+    }
+  };
+
+  const handleUploadPolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!policyFile || !policyTitle) return;
+    setUploadingPolicy(true);
+    const formData = new FormData();
+    formData.append('file', policyFile);
+    formData.append('title', policyTitle);
+    formData.append('department', policyDept);
+    formData.append('version', policyVersion);
+
+    try {
+      await apiClient.post('/api/admin/policies/upload', formData, {
+        timeout: 120000,
+      });
+      triggerToast('Bank Policy document ingested and compiled successfully.');
+      setPolicyFile(null);
+      setPolicyTitle('');
+      fetchPolicies();
+      fetchNotifications();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Policy upload failed', true);
+    } finally {
+      setUploadingPolicy(false);
+    }
+  };
+
+  const handleReassign = async (gapId: string) => {
+    if (!selectedNewEmpId) return;
+    setActionLoading(gapId);
+    try {
+      const formData = new FormData();
+      formData.append('new_employee_id', selectedNewEmpId);
+      await apiClient.patch(`/api/gaps/${gapId}/reassign`, formData);
+      triggerToast(`Task successfully reassigned to ${selectedNewEmpId}.`);
+      setReassigningGapId(null);
+      setSelectedNewEmpId('');
+      fetchGaps();
+      fetchNotifications();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Reassignment failed', true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCancelGap = async (gapId: string) => {
+    const reason = prompt('Please enter a cancellation justification (Mandatory):');
+    if (reason === null) return; // cancelled
+    if (!reason.trim()) {
+      alert('Cancellation reason is mandatory!');
+      return;
+    }
+    setActionLoading(gapId);
+    try {
+      const formData = new FormData();
+      formData.append('reason', reason);
+      await apiClient.patch(`/api/gaps/${gapId}/cancel`, formData);
+      triggerToast('Gap cancelled successfully.');
+      fetchGaps();
+      fetchNotifications();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Cancel request failed', true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleApproveFix = async (gapId: string) => {
+    setActionLoading(gapId);
+    try {
+      await apiClient.post(`/api/gaps/${gapId}/approve-fix`);
+      triggerToast('Revisions approved! Core policy updated.');
+      fetchGaps();
+      fetchPolicies();
+      fetchNotifications();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Approval failed', true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResolveOrphan = async (gapId: string) => {
+    setActionLoading(gapId);
+    try {
+      const formData = new FormData();
+      formData.append('department_id', orphanRouteDept);
+      await apiClient.put(`/api/gaps/admin/circulars/${gapId}/resolve-orphan`, formData);
+      triggerToast(`Directive successfully routed to ${orphanRouteDept}.`);
+      setRoutingOrphanId(null);
+      fetchGaps();
+      fetchOrphans();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Routing failed', true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleArchivePolicy = async (policyId: string) => {
+    setActionLoading(policyId);
+    try {
+      await apiClient.patch(`/api/admin/policies/${policyId}/archive`);
+      triggerToast('Policy archived successfully.');
+      fetchPolicies();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Archive failed', true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUnarchivePolicy = async (policyId: string) => {
+    setActionLoading(policyId);
+    try {
+      await apiClient.patch(`/api/admin/policies/${policyId}/unarchive`);
+      triggerToast('Policy restored.');
+      fetchPolicies();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Unarchive failed', true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeletePolicy = async (policyId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this policy?')) return;
+    setActionLoading(policyId);
+    try {
+      await apiClient.delete(`/api/admin/policies/${policyId}`);
+      triggerToast('Policy deleted permanently.');
+      fetchPolicies();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Delete failed', true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Bulk Actions
+  const handleBulkAssign = async () => {
+    if (selectedGapIds.length === 0 || !bulkHOD) return;
+    try {
+      const formData = new FormData();
+      selectedGapIds.forEach(id => formData.append('gap_ids', id));
+      formData.append('hod_id', bulkHOD);
+      if (bulkEmployee) formData.append('employee_id', bulkEmployee);
+
+      await apiClient.post('/api/gaps/bulk-assign', formData);
+      triggerToast(`Bulk reassigned ${selectedGapIds.length} gaps.`);
+      setSelectedGapIds([]);
+      fetchGaps();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Bulk assignment failed', true);
+    }
+  };
+
+  const handleBulkSeverity = async () => {
+    if (selectedGapIds.length === 0 || !bulkSeverity) return;
+    try {
+      const formData = new FormData();
+      selectedGapIds.forEach(id => formData.append('gap_ids', id));
+      formData.append('severity', bulkSeverity);
+
+      await apiClient.post('/api/gaps/bulk-severity', formData);
+      triggerToast(`Bulk updated severity for ${selectedGapIds.length} gaps.`);
+      setSelectedGapIds([]);
+      fetchGaps();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Bulk severity update failed', true);
+    }
+  };
+
+  const exportSelectedToCSV = () => {
+    if (selectedGapIds.length === 0) return;
+    const selectedGaps = gaps.filter(g => selectedGapIds.includes(g.gap_id));
+    
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Gap ID,Circular Title,Clause Text,Severity,Department,Assignee,Status,Due Date\n";
+    
+    selectedGaps.forEach(g => {
+      const row = [
+        g.gap_id,
+        `"${(g.circular_title || '').replace(/"/g, '""')}"`,
+        `"${(g.clause_text || '').replace(/"/g, '""')}"`,
+        g.severity,
+        g.department_id || 'N/A',
+        g.assigned_employee || 'Unassigned',
+        g.triage_status,
+        g.due_date ? new Date(g.due_date).toLocaleDateString() : 'N/A'
+      ].join(",");
+      csvContent += row + "\n";
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `suraksha_gaps_export_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Toggle selection
+  const toggleSelectGap = (gapId: string) => {
+    setSelectedGapIds(prev => 
+      prev.includes(gapId) ? prev.filter(id => id !== gapId) : [...prev, gapId]
+    );
+  };
+
+  const toggleSelectAll = (visibleGaps: any[]) => {
+    const visibleIds = visibleGaps.map(g => g.gap_id);
+    const allSelected = visibleIds.every(id => selectedGapIds.includes(id));
+    if (allSelected) {
+      setSelectedGapIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedGapIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  // Analytics Calculation
+  const getDeptAnalyticsData = () => {
+    const depts = ["Compliance", "IT Security", "Risk Management", "Finance", "Operations", "Credit", "HR"];
+    const mapper: Record<string, string> = {
+      "Compliance": "DEPT-COMPLIANCE",
+      "IT Security": "DEPT-IT-CYBER",
+      "Risk Management": "DEPT-RISK",
+      "Finance": "DEPT-FINANCE",
+      "Operations": "DEPT-OPS",
+      "Credit": "DEPT-CREDIT",
+      "HR": "DEPT-HR"
+    };
+    return depts.map(d => {
+      const code = mapper[d];
+      return {
+        name: d,
+        value: gaps.filter(g => g.department_id === code).length
+      };
+    }).filter(d => d.value > 0);
+  };
+
+  const getSeverityAnalyticsData = () => {
+    const levels = ["critical", "high", "medium", "low"];
+    return levels.map(l => ({
+      name: l.toUpperCase(),
+      value: gaps.filter(g => g.severity === l).length
+    }));
+  };
+
+  // Filter Gaps
+  const getFilteredGaps = () => {
+    return gaps.filter(g => {
+      if (filterDept && g.department_id !== filterDept) return false;
+      if (filterSeverity && g.severity !== filterSeverity) return false;
+      if (filterStatus && g.triage_status !== filterStatus) return false;
+      return true;
+    });
+  };
+
+  const filteredGaps = getFilteredGaps();
+
+  // Timeline view calculation
+  const getGapsGroupedByDay = () => {
+    const groups: Record<string, any[]> = {};
+    filteredGaps.forEach(g => {
+      const dateStr = new Date(g.created_at).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      if (!groups[dateStr]) groups[dateStr] = [];
+      groups[dateStr].push(g);
+    });
+    return groups;
+  };
+
+  const activeGapsCount = gaps.filter(g => g.triage_status === 'assigned' || g.triage_status === 'open').length;
+  const resolvedGapsPendingApproval = gaps.filter(g => g.triage_status === 'resolved' && g.is_fixed).length;
+  const newPolicyRequiredGaps = gaps.filter(g => g.gap_type === 'new_policy_required');
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
-      {/* Upper Title block */}
+    <div className="space-y-6 max-w-[1600px] mx-auto pb-10 px-4">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-cyan/15 pb-4">
         <div>
           <h1 className="text-2xl font-bold font-mono tracking-wider text-cyber-cyan flex items-center gap-2">
-            <Cpu className="w-6 h-6 text-cyber-cyan animate-pulse-glow" />
-            CONTROL TOWER COGNITIVE CONSOLE
+            <Shield className="w-6 h-6 text-cyber-cyan animate-pulse-glow" />
+            ADMINISTRATOR COMMAND CENTER
           </h1>
           <p className="text-xs text-muted-foreground font-mono mt-1">
-            Real-time compliance validation, behavioral threat intelligence, and deterministic policy matching.
+            Real-time compliance monitoring, prefix-based category routing, and cross-reference regression logs.
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-obsidian-950 px-3 py-1.5 border border-cyber-cyan/15 rounded text-[10px] font-mono">
-          <span className="w-2 h-2 rounded-full bg-cyber-green animate-pulse" />
-          <span className="text-slate-400">{t('LEDGER STATE:')}</span>
-          <span className="text-cyber-green font-bold">{t('SYNCHRONIZED // BLOCK_HEIGHT 8129B')}</span>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { fetchGaps(); fetchPolicies(); fetchNotifications(); fetchOrphans(); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-cyber-cyan/35 hover:border-cyber-cyan bg-obsidian-950 hover:bg-cyber-cyan/5 rounded text-xs font-mono text-cyber-cyan"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Sync Data
+          </button>
         </div>
       </div>
 
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Coverage Card */}
-        <GlassCard glowColor="cyan" className="p-5 border-cyber-cyan/20 relative overflow-hidden group hover:scale-[1.01] transition-transform">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyber-cyan/5 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{t('Regulatory Coverage')}</span>
-              <h3 className="text-3xl font-bold font-mono text-cyber-cyan tracking-tight">
-                {data.regulatory_coverage.processed}<span className="text-sm font-semibold text-slate-500"> / {data.regulatory_coverage.total}</span>
-              </h3>
-            </div>
-            <div className="p-2 bg-cyber-cyan/10 border border-cyber-cyan/30 rounded-lg text-cyber-cyan">
-              <FileText className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span>{t('Circulars fully mapped')}</span>
-            <span className="text-cyber-green font-bold">
-              {Math.round((data.regulatory_coverage.processed / (data.regulatory_coverage.total || 1)) * 100)}% Coverage
-            </span>
-          </div>
-          <div className="h-1 bg-obsidian-950 rounded-full mt-2.5 overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-cyber-cyan to-cyber-blue shadow-glow-cyan" 
-              style={{ width: `${(data.regulatory_coverage.processed / (data.regulatory_coverage.total || 1)) * 100}%` }}
-            />
-          </div>
-        </GlassCard>
+      {/* Notifications Banners */}
+      {successMsg && (
+        <div className="p-3 bg-emerald-950/30 border border-emerald-500/40 text-emerald-400 text-xs font-mono rounded">
+          {successMsg.toUpperCase()}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="p-3 bg-red-950/30 border border-red-500/40 text-red-400 text-xs font-mono rounded">
+          {errorMsg.toUpperCase()}
+        </div>
+      )}
 
-        {/* Confirmed Gaps Card */}
-        <GlassCard glowColor="magenta" className="p-5 border-cyber-magenta/20 relative overflow-hidden group hover:scale-[1.01] transition-transform">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyber-magenta/5 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{t('Active Confirmed Gaps')}</span>
-              <h3 className="text-3xl font-bold font-mono text-cyber-magenta tracking-tight">
-                {data.active_gaps.confirmed}
-              </h3>
-            </div>
-            <div className="p-2 bg-cyber-magenta/10 border border-cyber-magenta/30 rounded-lg text-cyber-magenta shadow-glow-magenta/20">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span>{t('Requires instant mitigation')}</span>
-            <span className="text-cyber-blue font-bold">
-              {data.active_gaps.suspected} Suspected
-            </span>
-          </div>
-          <div className="h-1 bg-obsidian-950 rounded-full mt-2.5 overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-cyber-magenta to-red-500 shadow-glow-magenta" 
-              style={{ width: `${Math.min(100, (data.active_gaps.confirmed / 20) * 100)}%` }}
-            />
-          </div>
+      {/* KPI stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <GlassCard className="p-4 border-cyber-cyan/15">
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Active Policy Gaps</span>
+          <h3 className="text-3xl font-bold font-mono text-cyber-cyan mt-1">{activeGapsCount}</h3>
         </GlassCard>
-
-        {/* MAP Completion Card */}
-        <GlassCard glowColor="blue" className="p-5 border-cyber-blue/20 relative overflow-hidden group hover:scale-[1.01] transition-transform">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyber-blue/5 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{t('MAP Completion Rate')}</span>
-              <h3 className="text-3xl font-bold font-mono text-cyber-blue tracking-tight">
-                {data.map_completion.rate}%
-              </h3>
-            </div>
-            <div className="p-2 bg-cyber-blue/10 border border-cyber-blue/30 rounded-lg text-cyber-blue">
-              <CheckSquare className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span>On-time execution target</span>
-            <span className="text-cyber-cyan font-bold">{t('ALPHA RATE')}</span>
-          </div>
-          <div className="h-1 bg-obsidian-950 rounded-full mt-2.5 overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-cyber-blue to-cyber-cyan shadow-glow-blue" 
-              style={{ width: `${data.map_completion.rate}%` }}
-            />
-          </div>
+        <GlassCard className="p-4 border-cyber-magenta/15">
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Awaiting HOD Approvals</span>
+          <h3 className="text-3xl font-bold font-mono text-cyber-magenta mt-1">{resolvedGapsPendingApproval}</h3>
         </GlassCard>
-
-        {/* Behavioral Health Card */}
-        <GlassCard glowColor="green" className="p-5 border-cyber-green/20 relative overflow-hidden group hover:scale-[1.01] transition-transform">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyber-green/5 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{t('Behavioral Health')}</span>
-              <h3 className="text-3xl font-bold font-mono text-cyber-green tracking-tight">
-                {data.behavioral_health.green_sessions}%
-              </h3>
-            </div>
-            <div className="p-2 bg-cyber-green/10 border border-cyber-green/30 rounded-lg text-cyber-green shadow-glow-green/20">
-              <Activity className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span>{t('Zero-Trust validation')}</span>
-            <span className="text-cyber-green font-bold">{t('SECURE SESSIONS')}</span>
-          </div>
-          <div className="h-1 bg-obsidian-950 rounded-full mt-2.5 overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-cyber-green to-cyber-cyan shadow-glow-green" 
-              style={{ width: `${data.behavioral_health.green_sessions}%` }}
-            />
-          </div>
+        <GlassCard className="p-4 border-amber-500/15">
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">New Policies Required</span>
+          <h3 className="text-3xl font-bold font-mono text-amber-400 mt-1">{newPolicyRequiredGaps.length}</h3>
+        </GlassCard>
+        <GlassCard className="p-4 border-cyber-green/15">
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Orphaned Directives</span>
+          <h3 className="text-3xl font-bold font-mono text-cyber-green mt-1">{orphanedDirectives.length}</h3>
         </GlassCard>
       </div>
 
-      {/* Main Charts & Terminal Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Compliance Trend Chart Widget */}
-        <GlassCard className="xl:col-span-2 p-6 border-cyber-cyan/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-cyber-cyan/10 pb-3 mb-4">
-              <h2 className="text-sm font-bold font-mono tracking-wider text-cyber-cyan uppercase flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-cyber-cyan" />
-                Cognitive Defense Trends (7-Day Metric)
-              </h2>
-              <span className="text-[10px] font-mono text-muted-foreground">{t('REAL-TIME TELEMETRY FEED')}</span>
-            </div>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorCompliance" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00d9ff" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#00d9ff" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorGaps" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ff00ff" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#ff00ff" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} className="font-mono" />
-                  <YAxis stroke="#94a3b8" fontSize={10} className="font-mono" />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0a0e27', borderColor: '#00d9ff', borderRadius: '8px' }}
-                    labelStyle={{ color: '#00d9ff', fontFamily: 'monospace', fontSize: '10px' }}
-                    itemStyle={{ color: '#ffffff', fontFamily: 'monospace', fontSize: '10px' }}
-                  />
-                  <Area type="monotone" dataKey="compliance" name="Compliance Rate (%)" stroke="#00d9ff" strokeWidth={2} fillOpacity={1} fill="url(#colorCompliance)" />
-                  <Area type="monotone" dataKey="activeGaps" name="Active Gaps" stroke="#ff00ff" strokeWidth={2} fillOpacity={1} fill="url(#colorGaps)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-cyber-cyan/10">
+        {(['gaps', 'upload', 'approvals', 'policies', 'orphans'] as const).map(tab => {
+          const active = activeTab === tab;
+          const labels = {
+            gaps: 'Remediation Queue',
+            upload: 'Ingest Center',
+            approvals: `Pending Updates (${resolvedGapsPendingApproval})`,
+            policies: 'Core Policy Repository',
+            orphans: `Orphaned Directives (${orphanedDirectives.length})`
+          };
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-3 font-mono text-xs font-bold transition-all border-b-2 ${
+                active 
+                  ? 'border-cyber-cyan text-cyber-cyan bg-cyber-cyan/5' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {labels[tab]}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* GAPS PANEL */}
+      {activeTab === 'gaps' && (
+        <div className="space-y-6">
+          {/* SVG Charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <GlassCard className="p-4 border-cyber-cyan/10">
+              <h3 className="text-xs font-mono font-bold text-slate-400 uppercase mb-3">Gaps by Department</h3>
+              <div className="flex justify-center items-center h-48">
+                {getDeptAnalyticsData().length === 0 ? (
+                  <span className="text-xs text-slate-500 font-mono">No active gaps to chart</span>
+                ) : (
+                  <svg width="100%" height="100%" viewBox="0 0 400 180">
+                    {getDeptAnalyticsData().map((item, idx) => {
+                      const barWidth = (item.value / Math.max(...getDeptAnalyticsData().map(d => d.value))) * 220;
+                      const yPos = idx * 24 + 10;
+                      return (
+                        <g key={item.name}>
+                          <text x="10" y={yPos + 14} fill="#94a3b8" className="text-[10px] font-mono">{item.name}</text>
+                          <rect x="130" y={yPos} width={barWidth} height="16" fill="#06b6d4" rx="2" className="transition-all hover:fill-[#d946ef]" />
+                          <text x={135 + barWidth} y={yPos + 12} fill="#06b6d4" className="text-[10px] font-mono font-bold">{item.value}</text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                )}
+              </div>
+            </GlassCard>
+            
+            <GlassCard className="p-4 border-cyber-cyan/10">
+              <h3 className="text-xs font-mono font-bold text-slate-400 uppercase mb-3">Gaps by Severity</h3>
+              <div className="flex justify-center items-center h-48">
+                {getSeverityAnalyticsData().filter(d => d.value > 0).length === 0 ? (
+                  <span className="text-xs text-slate-500 font-mono">No active gaps to chart</span>
+                ) : (
+                  <svg width="100%" height="100%" viewBox="0 0 400 180">
+                    {getSeverityAnalyticsData().map((item, idx) => {
+                      const barHeight = (item.value / Math.max(1, ...getSeverityAnalyticsData().map(d => d.value))) * 110;
+                      const xPos = idx * 80 + 50;
+                      const severityColors = ["#ef4444", "#f59e0b", "#3b82f6", "#10b981"];
+                      return (
+                        <g key={item.name}>
+                          <rect x={xPos} y={130 - barHeight} width="40" height={barHeight} fill={severityColors[idx]} rx="2" />
+                          <text x={xPos + 20} y={145} textAnchor="middle" fill="#94a3b8" className="text-[9px] font-mono">{item.name}</text>
+                          <text x={xPos + 20} y={125 - barHeight} textAnchor="middle" fill="#f8fafc" className="text-[10px] font-mono font-bold">{item.value}</text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                )}
+              </div>
+            </GlassCard>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-cyber-cyan/10 pt-4 mt-4 text-[10px] font-mono">
-            <div className="p-2.5 bg-obsidian-950/60 rounded border border-cyber-cyan/5">
-              <div className="text-slate-500">{t('PEAK COMPLIANCE RATE:')}</div>
-              <div className="text-cyber-cyan font-bold text-sm mt-0.5">93.0% (MAXIMUM SECURED)</div>
+          {/* Filters and Controls */}
+          <GlassCard className="p-4 border-cyber-cyan/10 font-mono text-xs flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex flex-wrap gap-2 items-center">
+              <Filter className="w-4 h-4 text-cyber-cyan" />
+              <select
+                value={filterDept}
+                onChange={(e) => setFilterDept(e.target.value)}
+                className="bg-obsidian-950 border border-cyber-cyan/20 text-slate-300 p-1.5 rounded"
+              >
+                <option value="">All Departments</option>
+                <option value="DEPT-COMPLIANCE">Compliance</option>
+                <option value="DEPT-IT-CYBER">IT Security</option>
+                <option value="DEPT-RISK">Risk Management</option>
+                <option value="DEPT-FINANCE">Finance</option>
+                <option value="DEPT-OPS">Operations</option>
+                <option value="DEPT-CREDIT">Credit</option>
+                <option value="DEPT-HR">HR</option>
+              </select>
+              <select
+                value={filterSeverity}
+                onChange={(e) => setFilterSeverity(e.target.value)}
+                className="bg-obsidian-950 border border-cyber-cyan/20 text-slate-300 p-1.5 rounded"
+              >
+                <option value="">All Severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-obsidian-950 border border-cyber-cyan/20 text-slate-300 p-1.5 rounded"
+              >
+                <option value="">All Statuses</option>
+                <option value="assigned">Assigned</option>
+                <option value="open">Open (Unassigned)</option>
+                <option value="resolved">Resolved</option>
+                <option value="superseded">Superseded</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-400 hover:text-slate-200 ml-2">
+                <input 
+                  type="checkbox" 
+                  checked={groupByDay} 
+                  onChange={(e) => setGroupByDay(e.target.checked)} 
+                  className="rounded border-cyber-cyan/20 bg-obsidian-950" 
+                />
+                Group by Day (Timeline)
+              </label>
             </div>
-            <div className="p-2.5 bg-obsidian-950/60 rounded border border-cyber-cyan/5">
-              <div className="text-slate-500">{t('MITIGATION VELOCITY:')}</div>
-              <div className="text-cyber-magenta font-bold text-sm mt-0.5">-1.57 GAPS / DAY (EFFICIENT)</div>
-            </div>
-          </div>
-        </GlassCard>
-
-        {/* High-fidelity Security Alert Terminal */}
-        <GlassCard className="p-6 border-cyber-cyan/10 flex flex-col h-[460px]">
-          <div className="flex items-center justify-between border-b border-cyber-cyan/10 pb-3 mb-4">
-            <h2 className="text-sm font-bold font-mono tracking-wider text-cyber-cyan uppercase flex items-center gap-2">
-              <TerminalIcon className="w-4 h-4 text-cyber-cyan animate-pulse" />
-              INTELLIGENCE ALERT TERMINAL
-            </h2>
-            <div className="flex gap-1">
-              {(['all', 'error', 'warning', 'info'] as const).map(f => (
+            {selectedGapIds.length > 0 && (
+              <div className="flex gap-2 items-center bg-cyber-cyan/5 border border-cyber-cyan/25 px-3 py-1 rounded">
+                <span className="font-bold text-cyber-cyan text-[10px] uppercase">{selectedGapIds.length} Selected</span>
                 <button
-                  key={f}
-                  onClick={() => setTerminalFilter(f)}
-                  className={`text-[9px] px-1.5 py-0.5 font-mono uppercase rounded ${
-                    terminalFilter === f 
-                      ? 'bg-cyber-cyan text-obsidian-950 font-bold' 
-                      : 'text-slate-500 bg-obsidian-900 border border-cyber-cyan/5 hover:text-slate-300'
-                  }`}
+                  onClick={exportSelectedToCSV}
+                  className="p-1 bg-obsidian-950 hover:bg-cyber-cyan/10 border border-cyber-cyan/20 text-cyber-cyan rounded flex items-center gap-1 text-[10px]"
                 >
-                  {f}
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> CSV
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Terminal Box */}
-          <div className="flex-1 bg-obsidian-950 border border-cyber-cyan/10 p-3 rounded-lg font-mono text-[11px] overflow-y-auto space-y-2 select-text scrollbar-thin">
-            {filteredAlerts.length > 0 ? (
-              filteredAlerts.map((alert: any, i: number) => {
-                const isErr = alert.type === 'error';
-                const isWarn = alert.type === 'warning';
-                return (
-                  <div key={i} className="flex gap-2 items-start leading-relaxed animate-glow-flicker">
-                    <span className={`shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold ${
-                      isErr 
-                        ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                        : isWarn 
-                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
-                          : 'bg-cyber-blue/20 text-cyber-blue border border-cyber-blue/30'
-                    }`}>
-                      {alert.type.toUpperCase()}
-                    </span>
-                    <span className="text-slate-300">{alert.message}</span>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-slate-500 text-center py-10 italic">
-                NO THREAT EVENT PACKETS RECORDED FOR THIS CLASS.
+                <div className="h-4 w-px bg-cyber-cyan/20" />
+                <select
+                  value={bulkHOD}
+                  onChange={(e) => setBulkHOD(e.target.value)}
+                  className="bg-obsidian-950 border border-cyber-cyan/25 text-slate-300 text-[10px] p-1 rounded"
+                >
+                  <option value="">Bulk Assign HOD</option>
+                  <option value="DEPT-COMPLIANCE">Compliance HOD</option>
+                  <option value="DEPT-IT-CYBER">IT Security HOD</option>
+                  <option value="DEPT-RISK">Risk Management HOD</option>
+                  <option value="DEPT-FINANCE">Finance HOD</option>
+                  <option value="DEPT-OPS">Operations HOD</option>
+                  <option value="DEPT-CREDIT">Credit HOD</option>
+                  <option value="DEPT-HR">HR HOD</option>
+                </select>
+                <button
+                  onClick={handleBulkAssign}
+                  disabled={!bulkHOD}
+                  className="px-2 py-1 bg-cyber-cyan hover:scale-105 transition-transform text-obsidian-950 font-bold rounded text-[10px]"
+                >
+                  Apply
+                </button>
+                <select
+                  value={bulkSeverity}
+                  onChange={(e) => setBulkSeverity(e.target.value)}
+                  className="bg-obsidian-950 border border-cyber-cyan/25 text-slate-300 text-[10px] p-1 rounded"
+                >
+                  <option value="">Bulk Severity</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <button
+                  onClick={handleBulkSeverity}
+                  disabled={!bulkSeverity}
+                  className="px-2 py-1 bg-cyber-cyan hover:scale-105 transition-transform text-obsidian-950 font-bold rounded text-[10px]"
+                >
+                  Set
+                </button>
               </div>
             )}
-          </div>
-          <div className="mt-3 flex justify-between items-center text-[9px] font-mono text-slate-500">
-            <span>{t('PACKETS BUFFERED: ')}{filteredAlerts.length}</span>
-            <span className="animate-pulse text-cyber-cyan">{t('SCANNING CHANNEL...')}</span>
-          </div>
-        </GlassCard>
-      </div>
+          </GlassCard>
 
-      {/* Quick Action Matrix */}
-      <GlassCard className="p-6 border-cyber-cyan/10">
-        <h2 className="text-sm font-bold font-mono tracking-wider text-cyber-cyan uppercase border-b border-cyber-cyan/10 pb-3 mb-4 flex items-center gap-2">
-          <Shield className="w-4 h-4 text-cyber-cyan" />
-          CRITICAL COMMAND ACTIONS MATRIX
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <button 
-            onClick={() => navigate('/admin/policies')}
-            className="flex items-center justify-between p-4 bg-obsidian-950/40 hover:bg-cyber-blue/5 border border-cyber-cyan/10 hover:border-cyber-blue/50 rounded-xl transition-all group font-mono"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyber-blue/10 text-cyber-blue rounded-lg">
-                <Layers className="w-5 h-5" />
+          {/* New Policy Required Alert */}
+          {newPolicyRequiredGaps.length > 0 && (
+            <div className="p-4 bg-amber-950/20 border border-amber-500/35 rounded-xl font-mono text-xs text-amber-300 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertOctagon className="w-5 h-5 text-amber-500 animate-bounce" />
+                <div>
+                  <p className="font-bold">⚠️ NEW REGULATORY DOMAINS DETECTED</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">The engine parsed {newPolicyRequiredGaps.length} circular guidelines that do not map to any existing policies. New bank policies need to be created.</p>
+                </div>
               </div>
-              <div className="text-left">
-                <span className="block text-xs font-bold text-slate-200">{t('Policy Manager')}</span>
-                <span className="text-[10px] text-slate-500">{t('Audit policy versions')}</span>
-              </div>
+              <button 
+                onClick={() => { setFilterStatus(''); setFilterSeverity(''); setFilterDept(''); }}
+                className="px-3 py-1 bg-amber-500 text-obsidian-950 font-bold rounded hover:scale-105 transition-transform"
+              >
+                Inspect Guidelines
+              </button>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-cyber-blue group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          </button>
+          )}
 
-          <button 
-            onClick={() => navigate('/admin/graph-health')}
-            className="flex items-center justify-between p-4 bg-obsidian-950/40 hover:bg-cyber-cyan/5 border border-cyber-cyan/10 hover:border-cyber-cyan/50 rounded-xl transition-all group font-mono"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyber-cyan/10 text-cyber-cyan rounded-lg">
-                <Activity className="w-5 h-5 animate-pulse" />
+          {/* Gaps Queue */}
+          <GlassCard className="p-6 border-cyber-cyan/10">
+            {loadingGaps ? (
+              <div className="text-center py-12 text-slate-400 font-mono text-xs animate-pulse">Syncing ledger data...</div>
+            ) : filteredGaps.length === 0 ? (
+              <div className="text-center py-16 text-slate-500 font-mono text-xs">No matching gaps found. Adjust filters or upload a circular to verify compliance.</div>
+            ) : groupByDay ? (
+              // Grouped chronological view
+              <div className="space-y-6">
+                {Object.entries(getGapsGroupedByDay()).map(([day, items]) => (
+                  <div key={day} className="space-y-2">
+                    <h3 className="text-xs font-mono font-bold text-cyber-cyan border-b border-cyber-cyan/15 pb-1 flex items-center gap-1.5 uppercase">
+                      <Clock className="w-3.5 h-3.5" /> {day}
+                    </h3>
+                    <div className="grid grid-cols-1 gap-2">
+                      {items.map(gap => (
+                        <div key={gap.gap_id} className="p-3 bg-obsidian-950/60 border border-cyber-cyan/10 rounded-lg flex flex-wrap justify-between items-center gap-4 text-xs font-mono">
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedGapIds.includes(gap.gap_id)}
+                              onChange={() => toggleSelectGap(gap.gap_id)}
+                              className="rounded border-cyber-cyan/20 bg-obsidian-950 text-cyber-cyan"
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-cyber-magenta">{gap.gap_id}</span>
+                                <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold ${
+                                  gap.severity === 'critical' ? 'bg-red-500/10 text-red-400' :
+                                  gap.severity === 'high' ? 'bg-amber-500/10 text-amber-400' :
+                                  'bg-blue-500/10 text-blue-400'
+                                }`}>
+                                  {gap.severity.toUpperCase()}
+                                </span>
+                                {gap.source === 'fix_regression' && (
+                                  <span className="px-1.5 py-0.2 bg-purple-500/15 text-purple-400 rounded text-[8px] font-bold">REGRESSION</span>
+                                )}
+                              </div>
+                              <p className="text-slate-200 mt-1 font-sans">{gap.circular_title}</p>
+                              <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5" title={gap.clause_text}>{gap.clause_text}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="text-cyber-blue font-bold">{gap.department_id?.replace("DEPT-", "")}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">{gap.assigned_employee || 'Unassigned'}</p>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                              gap.triage_status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                              gap.triage_status === 'superseded' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                              gap.triage_status === 'cancelled' ? 'bg-slate-700/20 text-slate-500' :
+                              'bg-red-500/10 text-red-400 border border-red-500/20'
+                            }`}>
+                              {gap.triage_status.toUpperCase()}
+                            </span>
+                            <div className="flex gap-1">
+                              {gap.triage_status === 'assigned' && (
+                                <button 
+                                  onClick={() => handleCancelGap(gap.gap_id)}
+                                  className="p-1 hover:text-red-400 text-slate-400 rounded hover:bg-white/5"
+                                  title="Cancel Gap"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="text-left">
-                <span className="block text-xs font-bold text-slate-200">{t('Graph Diagnostics')}</span>
-                <span className="text-[10px] text-slate-500">{t('Monitor graph database')}</span>
+            ) : (
+              // Table List View
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse font-mono text-xs">
+                  <thead>
+                    <tr className="border-b border-cyber-cyan/20 text-slate-400 text-[10px] uppercase">
+                      <th className="pb-3 pl-2">
+                        <input 
+                          type="checkbox" 
+                          checked={filteredGaps.length > 0 && filteredGaps.every(g => selectedGapIds.includes(g.gap_id))}
+                          onChange={() => toggleSelectAll(filteredGaps)}
+                          className="rounded border-cyber-cyan/20 bg-obsidian-950"
+                        />
+                      </th>
+                      <th className="pb-3">Gap ID</th>
+                      <th className="pb-3">Circular Guideline</th>
+                      <th className="pb-3 text-center">Page</th>
+                      <th className="pb-3">Policy Match</th>
+                      <th className="pb-3">Department</th>
+                      <th className="pb-3">Assignee</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3 text-right pr-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cyber-cyan/5">
+                    {filteredGaps.map(gap => (
+                      <tr key={gap.gap_id} className="hover:bg-white/5 transition-colors">
+                        <td className="py-4 pl-2">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedGapIds.includes(gap.gap_id)}
+                            onChange={() => toggleSelectGap(gap.gap_id)}
+                            className="rounded border-cyber-cyan/20 bg-obsidian-950 text-cyber-cyan"
+                          />
+                        </td>
+                        <td className="py-4 font-bold text-cyber-magenta">
+                          {gap.gap_id}
+                          <div className="mt-0.5">
+                            <span className={`px-1 rounded text-[8px] font-bold uppercase ${
+                              gap.severity === 'critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                              gap.severity === 'high' ? 'bg-amber-500/10 text-amber-400' :
+                              'bg-blue-500/10 text-blue-400'
+                            }`}>
+                              {gap.severity}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 max-w-[320px]">
+                          <p className="text-slate-200 font-semibold truncate" title={gap.circular_title}>{gap.circular_title}</p>
+                          <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5" title={gap.clause_text}>{gap.clause_text}</p>
+                        </td>
+                        <td className="py-4 text-center font-bold text-cyber-cyan">{gap.page_number}</td>
+                        <td className="py-4 text-slate-300 font-medium">{gap.top_policy_title || 'N/A'}</td>
+                        <td className="py-4 text-cyber-blue font-bold">
+                          {gap.department_id?.replace("DEPT-", "")}
+                          {gap.is_ambiguous && (
+                            <span className="block text-[8px] text-purple-400 font-bold uppercase mt-0.5">Ambiguous</span>
+                          )}
+                        </td>
+                        <td className="py-4">
+                          <div className="text-slate-300 font-semibold">{gap.assigned_employee || 'Unassigned'}</div>
+                          {gap.due_date && (
+                            <div className="text-[9px] text-slate-500">Due: {new Date(gap.due_date).toLocaleDateString()}</div>
+                          )}
+                        </td>
+                        <td className="py-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                            gap.triage_status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                            gap.triage_status === 'superseded' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                            gap.triage_status === 'cancelled' ? 'bg-slate-700/20 text-slate-500' :
+                            'bg-red-500/10 text-red-400 border border-red-500/20'
+                          }`}>
+                            {gap.triage_status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-4 text-right pr-2">
+                          <div className="flex gap-2 justify-end">
+                            {(gap.triage_status === 'assigned' || gap.triage_status === 'open') && (
+                              <>
+                                <button 
+                                  onClick={() => setReassigningGapId(gap.gap_id)}
+                                  className="px-2 py-1 bg-cyber-blue/10 hover:bg-cyber-blue text-cyber-blue hover:text-white border border-cyber-blue/30 rounded text-[10px] font-bold transition-all"
+                                >
+                                  Assign
+                                </button>
+                                <button 
+                                  onClick={() => handleCancelGap(gap.gap_id)}
+                                  disabled={actionLoading === gap.gap_id}
+                                  className="px-2 py-1 bg-red-950/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/25 rounded text-[10px] font-bold transition-all"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {reassigningGapId === gap.gap_id && (
+                            <div className="mt-2 flex gap-1 justify-end items-center">
+                              <select
+                                value={selectedNewEmpId}
+                                onChange={(e) => setSelectedNewEmpId(e.target.value)}
+                                className="bg-obsidian-950 border border-cyber-cyan/30 text-slate-300 text-[10px] px-1 py-0.5 rounded outline-none"
+                              >
+                                <option value="">Select Employee</option>
+                                {(employeesByDept[gap.department_id] || []).map(emp => (
+                                  <option key={emp.emp_id} value={emp.emp_id}>{emp.name} ({emp.emp_id})</option>
+                                ))}
+                              </select>
+                              <button 
+                                onClick={() => handleReassign(gap.gap_id)}
+                                className="p-1 bg-cyber-cyan text-obsidian-950 rounded hover:scale-105 transition-transform"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-cyber-cyan group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          </button>
-
-          <button 
-            onClick={() => navigate('/admin/ux-friction')}
-            className="flex items-center justify-between p-4 bg-obsidian-950/40 hover:bg-cyber-magenta/5 border border-cyber-cyan/10 hover:border-cyber-magenta/50 rounded-xl transition-all group font-mono"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyber-magenta/10 text-cyber-magenta rounded-lg">
-                <Search className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <span className="block text-xs font-bold text-slate-200">{t('UX Audit Console')}</span>
-                <span className="text-[10px] text-slate-500">{t('Trace user telemetry')}</span>
-              </div>
-            </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-cyber-magenta group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          </button>
-
-          <button 
-            onClick={() => navigate('/admin/users')}
-            className="flex items-center justify-between p-4 bg-obsidian-950/40 hover:bg-cyber-green/5 border border-cyber-cyan/10 hover:border-cyber-green/50 rounded-xl transition-all group font-mono"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyber-green/10 text-cyber-green rounded-lg">
-                <Users className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <span className="block text-xs font-bold text-slate-200">{t('Access Controls')}</span>
-                <span className="text-[10px] text-slate-500">{t('Modify member roles')}</span>
-              </div>
-            </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-cyber-green group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          </button>
+            )}
+          </GlassCard>
         </div>
-      </GlassCard>
+      )}
+
+      {/* ORPHANS TAB */}
+      {activeTab === 'orphans' && (
+        <GlassCard className="p-6 border-cyber-cyan/10 font-mono text-xs">
+          <h2 className="text-sm font-bold text-cyber-cyan uppercase mb-4">Orphaned Directives (Require Manual Department Routing)</h2>
+          {orphanedDirectives.length === 0 ? (
+            <div className="text-center py-16 text-slate-500">No orphaned directives in queue. All circular directives auto-routed successfully.</div>
+          ) : (
+            <div className="space-y-4">
+              {orphanedDirectives.map(gap => (
+                <div key={gap.gap_id} className="p-4 bg-obsidian-950 border border-cyber-magenta/20 rounded-xl space-y-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+                    <div>
+                      <span className="px-2 py-0.5 bg-cyber-magenta/15 text-cyber-magenta border border-cyber-magenta/30 rounded text-[9px] font-bold uppercase mr-2">Orphaned</span>
+                      <span className="font-bold text-slate-200">{gap.gap_id}</span>
+                      <h4 className="text-slate-300 font-bold mt-1">Circular: {gap.circular_title} (Page {gap.page_number})</h4>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <select
+                        value={orphanRouteDept}
+                        onChange={(e) => setOrphanRouteDept(e.target.value)}
+                        className="bg-obsidian-950 border border-cyber-cyan/25 text-slate-300 p-1.5 rounded"
+                      >
+                        <option value="DEPT-COMPLIANCE">Compliance</option>
+                        <option value="DEPT-IT-CYBER">IT Security</option>
+                        <option value="DEPT-RISK">Risk Management</option>
+                        <option value="DEPT-FINANCE">Finance</option>
+                        <option value="DEPT-OPS">Operations</option>
+                        <option value="DEPT-CREDIT">Credit</option>
+                        <option value="DEPT-HR">HR</option>
+                      </select>
+                      <button
+                        onClick={() => { setRoutingOrphanId(gap.gap_id); handleResolveOrphan(gap.gap_id); }}
+                        disabled={actionLoading === gap.gap_id}
+                        className="px-3 py-1.5 bg-cyber-cyan hover:bg-cyber-cyan/95 text-obsidian-950 font-bold rounded hover:scale-105 transition-transform"
+                      >
+                        Route Gap
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-obsidian-900 border border-cyber-cyan/5 rounded text-[11px] text-slate-300">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">RBI Directive text:</p>
+                    <p className="mt-0.5 font-sans leading-relaxed text-slate-200">{gap.clause_text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      {/* UPLOAD CENTER */}
+      {activeTab === 'upload' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <GlassCard className="p-6 border-cyber-cyan/10">
+            <h2 className="text-sm font-bold font-mono text-cyber-cyan mb-4 uppercase flex items-center gap-2">
+              <Upload className="w-4 h-4 text-cyber-cyan" />
+              Upload RBI Circular
+            </h2>
+            <form onSubmit={handleUploadCircular} className="space-y-4 font-mono text-xs">
+              <div className="border border-dashed border-cyber-cyan/30 hover:border-cyber-cyan/70 p-6 rounded-xl flex flex-col items-center justify-center bg-obsidian-950/40 cursor-pointer">
+                <FileText className="w-10 h-10 text-slate-400 mb-2" />
+                <input 
+                  type="file" 
+                  accept=".pdf,.txt,.docx" 
+                  onChange={(e) => setCircularFile(e.target.files?.[0] || null)}
+                  className="text-slate-300 font-mono text-xs"
+                />
+                <span className="text-[10px] text-slate-500 mt-2">PDF, DOCX, TXT (Max 50MB)</span>
+              </div>
+              {circularFile && (
+                <p className="text-cyber-green text-[10px] font-bold">Selected: {circularFile.name}</p>
+              )}
+              <button
+                type="submit"
+                disabled={uploadingCircular || !circularFile}
+                className="w-full py-2.5 bg-gradient-to-r from-cyber-cyan to-cyber-blue text-obsidian-950 font-bold rounded-lg hover:shadow-glow-cyan transition-all flex items-center justify-center gap-2 text-xs"
+              >
+                {uploadingCircular ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Ingesting & Segmenting RBI Circular...</>
+                ) : (
+                  <>Ingest Circular</>
+                )}
+              </button>
+            </form>
+          </GlassCard>
+
+          <GlassCard className="p-6 border-cyber-cyan/10">
+            <h2 className="text-sm font-bold font-mono text-cyber-cyan mb-4 uppercase flex items-center gap-2">
+              <Upload className="w-4 h-4 text-cyber-cyan" />
+              Upload Core Bank Policy
+            </h2>
+            <form onSubmit={handleUploadPolicy} className="space-y-3 font-mono text-xs">
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1">Policy Title</label>
+                <input 
+                  type="text" 
+                  value={policyTitle}
+                  onChange={(e) => setPolicyTitle(e.target.value)}
+                  placeholder="e.g. KYC Compliance Policy"
+                  className="w-full p-2 bg-obsidian-950 border border-cyber-cyan/20 focus:border-cyber-cyan rounded text-slate-200 outline-none"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Department Owner</label>
+                  <select 
+                    value={policyDept}
+                    onChange={(e) => setPolicyDept(e.target.value)}
+                    className="w-full p-2 bg-obsidian-950 border border-cyber-cyan/20 rounded text-slate-200 outline-none"
+                  >
+                    <option value="DEPT-COMPLIANCE">Compliance</option>
+                    <option value="DEPT-LEGAL">Legal</option>
+                    <option value="DEPT-RISK">Risk Management</option>
+                    <option value="DEPT-OPS">Operations</option>
+                    <option value="DEPT-FINANCE">Finance</option>
+                    <option value="DEPT-IT-CYBER">IT Security</option>
+                    <option value="DEPT-CREDIT">Credit</option>
+                    <option value="DEPT-HR">HR</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Version tag</label>
+                  <input 
+                    type="text" 
+                    value={policyVersion}
+                    onChange={(e) => setPolicyVersion(e.target.value)}
+                    className="w-full p-2 bg-obsidian-950 border border-cyber-cyan/20 rounded text-slate-200 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="border border-dashed border-cyber-cyan/30 hover:border-cyber-cyan/70 p-4 rounded-xl flex flex-col items-center justify-center bg-obsidian-950/40 cursor-pointer">
+                <input 
+                  type="file" 
+                  accept=".pdf,.txt,.docx"
+                  onChange={(e) => setPolicyFile(e.target.files?.[0] || null)}
+                  className="text-slate-300 font-mono text-xs"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={uploadingPolicy || !policyFile || !policyTitle}
+                className="w-full py-2.5 bg-gradient-to-r from-cyber-cyan to-cyber-blue text-obsidian-950 font-bold rounded-lg hover:shadow-glow-cyan transition-all flex items-center justify-center gap-2 text-xs"
+              >
+                {uploadingPolicy ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Ingesting & Segmenting Policy...</>
+                ) : (
+                  <>Ingest Core Policy</>
+                )}
+              </button>
+            </form>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* CORE POLICY APPROVALS */}
+      {activeTab === 'approvals' && (
+        <GlassCard className="p-6 border-cyber-cyan/10">
+          <h2 className="text-sm font-bold font-mono text-cyber-cyan uppercase mb-4">Gaps Resolved Pending Core Policy Integration</h2>
+          {gaps.filter(g => g.triage_status === 'resolved' && g.is_fixed).length === 0 ? (
+            <div className="text-center py-16 text-slate-500 font-mono text-xs">No resolved gaps require core policy integration. Gaps fixed by staff will appear here.</div>
+          ) : (
+            <div className="space-y-4">
+              {gaps.filter(g => g.triage_status === 'resolved' && g.is_fixed).map(gap => (
+                <div key={gap.gap_id} className="p-4 bg-obsidian-950 border border-cyber-green/35 rounded-xl font-mono text-xs space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-bold uppercase mr-2">Resolved</span>
+                      <span className="text-cyber-cyan font-bold">{gap.gap_id}</span>
+                      <h4 className="text-slate-200 font-bold mt-1">Core Policy Target: {gap.top_policy_title}</h4>
+                    </div>
+                    <button
+                      onClick={() => handleApproveFix(gap.gap_id)}
+                      disabled={actionLoading === gap.gap_id}
+                      className="px-4 py-2 bg-cyber-green hover:bg-cyber-green/90 text-obsidian-950 font-bold rounded flex items-center gap-1 hover:scale-105 transition-all text-xs"
+                    >
+                      {actionLoading === gap.gap_id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      Change Core Policy
+                    </button>
+                  </div>
+                  <div className="p-3 bg-obsidian-900 border border-cyber-cyan/5 rounded text-[11px] text-slate-300">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">Guideline Obligation:</p>
+                    <p className="mt-0.5 font-sans leading-relaxed text-slate-200">{gap.clause_text}</p>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold mt-2">Employee Revised Policy Text:</p>
+                    <p className="mt-0.5 font-sans whitespace-pre-line bg-obsidian-950 p-2 rounded text-slate-200 italic leading-relaxed border border-cyber-cyan/10">{gap.fixed_policy_content}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      {/* CORE POLICIES LIST */}
+      {activeTab === 'policies' && (
+        <GlassCard className="p-6 border-cyber-cyan/10">
+          <h2 className="text-sm font-bold font-mono text-cyber-cyan uppercase mb-4">Core Active Bank Policies</h2>
+          {policies.length === 0 ? (
+            <div className="text-center py-16 text-slate-500 font-mono text-xs">No active policies found in the database registry.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {policies.map(policy => {
+                const pid = policy.policy_id || policy.id;
+                const isArchived = policy.status === 'archived';
+                return (
+                  <div key={pid} className="p-4 bg-obsidian-950/60 border border-cyber-cyan/10 rounded-xl font-mono text-xs flex flex-col justify-between h-48 hover:border-cyber-cyan/40 transition-colors">
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <h4 className="text-slate-200 font-bold text-sm truncate max-w-[200px]" title={policy.title}>{policy.title}</h4>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-[4px] text-[9px] font-bold ${
+                            isArchived 
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}>
+                            {(policy.status || 'active').toUpperCase()}
+                          </span>
+                          <span className="px-2 py-0.5 bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/20 rounded-[4px] text-[9px] font-bold uppercase">{policy.version}</span>
+                        </div>
+                      </div>
+                      <span className="text-[9px] text-slate-400 bg-obsidian-900 px-2 py-0.5 rounded inline-block mt-1 font-bold">Owner: {policy.department}</span>
+                      <p className="text-slate-400 mt-3 line-clamp-3 leading-relaxed font-sans">{policy.content}</p>
+                    </div>
+                    <div className="border-t border-cyber-cyan/5 pt-2 mt-2 flex justify-between items-center text-[10px] text-slate-500">
+                      <span>Active from: {new Date(policy.valid_from).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-2">
+                        {isArchived ? (
+                          <button
+                            onClick={() => handleUnarchivePolicy(pid)}
+                            disabled={actionLoading === pid}
+                            className="p-1 hover:text-cyber-green text-slate-400 hover:scale-110 transition-all disabled:opacity-50"
+                            title="Restore to Active"
+                          >
+                            <ArchiveRestore className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleArchivePolicy(pid)}
+                            disabled={actionLoading === pid}
+                            className="p-1 hover:text-amber-400 text-slate-400 hover:scale-110 transition-all disabled:opacity-50"
+                            title="Archive Policy"
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeletePolicy(pid)}
+                          disabled={actionLoading === pid}
+                          className="p-1 hover:text-red-400 text-slate-400 hover:scale-110 transition-all disabled:opacity-50"
+                          title="Delete Policy"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </GlassCard>
+      )}
     </div>
   );
 }

@@ -5,15 +5,18 @@ from pydantic import BaseModel, Field
 
 
 MapStatus = Literal[
-    "draft",
-    "pending_review",
+    "pending_head_review",
     "approved",
-    "open",
+    "assigned",
     "in_progress",
-    "pending_validation",
-    "complete",
-    "escalated",
+    "under_validation",
+    "resolved",
     "rejected",
+    "escalated",
+    "pending_admin_assignment",
+    "draft",
+    "open",
+    "complete",
     "cancelled",
 ]
 RiskLevel = Literal["critical", "high", "medium", "low"]

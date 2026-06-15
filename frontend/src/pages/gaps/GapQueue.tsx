@@ -146,8 +146,6 @@ export const GapQueue = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGap, setSelectedGap] = useState<any>(null);
 
-  useEffect(() => { fetchQueue(); }, []);
-
   const fetchQueue = async () => {
     setLoading(true);
     try {
@@ -159,6 +157,11 @@ export const GapQueue = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchQueue();
+  }, []);
 
   const handleApprove = async (gap_id: string) => {
     await apiClient.post(`/api/gaps/queue/${gap_id}/approve`);

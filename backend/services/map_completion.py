@@ -6,8 +6,8 @@ from typing import Any
 
 from services.validator_service import validate_evidence
 
-ACCEPTED_VALIDATION_STATUSES = {"pass", "override_pass", "approved"}
-REVIEW_STATUSES = {"pending_validation", "manual_review", None, ""}
+ACCEPTED_VALIDATION_STATUSES = {"pass", "override_pass", "approved", "validated"}
+REVIEW_STATUSES = {"pending_validation", "manual_review", "pending", None, ""}
 
 
 def is_validation_accepted(status: str | None) -> bool:
@@ -35,6 +35,15 @@ async def validate_required_evidence(database: Any, map_doc: dict) -> dict:
             "reason": "no_required_evidence_configured",
         })
 
+    def clean_val_status(s: str | None) -> str:
+        if s == "pass":
+            return "validated"
+        if s == "fail":
+            return "rejected"
+        if s in ("validated", "rejected", "pending"):
+            return s
+        return "pending"
+
     for idx, item in required_items:
         label = item.get("label") or item.get("evidence_type") or f"Evidence {idx + 1}"
         if not item.get("uploaded"):
@@ -51,10 +60,10 @@ async def validate_required_evidence(database: Any, map_doc: dict) -> dict:
             blockers.append({"evidence_index": idx, "label": label, "reason": "evidence_record_not_found"})
             continue
 
-        status = evidence.get("validation_status")
-        if status in REVIEW_STATUSES:
+        status = clean_val_status(evidence.get("validation_status"))
+        if status in REVIEW_STATUSES or status == "pending":
             result = await validate_evidence(database, evidence_id)
-            status = result["validation_status"]
+            status = clean_val_status(result["validation_status"])
             evidence = await database.evidence.find_one({"evidence_id": evidence_id}) or evidence
 
         item["validation_status"] = status

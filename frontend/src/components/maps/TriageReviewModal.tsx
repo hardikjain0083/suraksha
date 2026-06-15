@@ -6,10 +6,21 @@ import type { TriageMapCard } from '../../types/map';
 import { ProvenanceTimeline } from './ProvenanceTimeline';
 
 const DEPARTMENTS = [
-  { id: 'DEPT-INFOSEC', name: 'Information Security' },
-  { id: 'DEPT-IT', name: 'IT Operations' },
   { id: 'DEPT-COMPLIANCE', name: 'Compliance' },
   { id: 'DEPT-LEGAL', name: 'Legal & Regulatory' },
+  { id: 'DEPT-RISK', name: 'Risk' },
+  { id: 'DEPT-OPS', name: 'Operations' },
+  { id: 'DEPT-BRANCH-BANKING', name: 'Branch Banking' },
+  { id: 'DEPT-IT-CYBER', name: 'IT / Cybersecurity' },
+  { id: 'DEPT-FINANCE', name: 'Finance / Accounts' },
+  { id: 'DEPT-HR', name: 'HR' },
+  { id: 'DEPT-RECOVERY', name: 'Recovery / Collections' },
+  { id: 'DEPT-TREASURY', name: 'Treasury' },
+  { id: 'DEPT-SME-CREDIT', name: 'SME / Retail / Credit' },
+  { id: 'DEPT-SECURITY-VIGILANCE', name: 'Security / Vigilance' },
+  { id: 'DEPT-CUSTOMER-SERVICE', name: 'Customer Service' },
+  { id: 'DEPT-MIS', name: 'MIS / Reporting' },
+  { id: 'DEPT-AUDIT', name: 'Audit / Inspection' },
 ];
 
 const EVIDENCE_OPTIONS = [
@@ -166,7 +177,7 @@ export const TriageReviewModal: React.FC<Props> = ({ card, onClose, onComplete }
             <motion.div>
               <label className="text-xs font-bold text-slate-500 uppercase">Department</label>
               <select
-                className="mt-1 w-full border rounded-lg px-2 py-2 text-sm"
+                className="mt-1 w-full border rounded-lg px-2 py-2 text-sm text-gray-900 bg-white"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
               >
@@ -179,7 +190,7 @@ export const TriageReviewModal: React.FC<Props> = ({ card, onClose, onComplete }
               <label className="text-xs font-bold text-slate-500 uppercase">Deadline</label>
               <input
                 type="date"
-                className="mt-1 w-full border rounded-lg px-2 py-2 text-sm"
+                className="mt-1 w-full border rounded-lg px-2 py-2 text-sm text-gray-900 bg-white"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
               />
@@ -187,7 +198,7 @@ export const TriageReviewModal: React.FC<Props> = ({ card, onClose, onComplete }
             <motion.div>
               <label className="text-xs font-bold text-slate-500 uppercase">Risk Level</label>
               <select
-                className="mt-1 w-full border rounded-lg px-2 py-2 text-sm"
+                className="mt-1 w-full border rounded-lg px-2 py-2 text-sm text-gray-900 bg-white"
                 value={risk}
                 onChange={(e) => setRisk(e.target.value)}
               >

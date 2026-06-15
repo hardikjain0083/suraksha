@@ -1,450 +1,463 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Clock, CheckCircle, AlertTriangle, Upload, FileCheck,
-  ChevronDown, ChevronUp, Loader2, XCircle, RefreshCw,
+import { useState, useEffect } from 'react';
+import { 
+  CheckCircle, 
+  AlertTriangle, 
+  Clock, 
+  Upload, 
+  FileText, 
+  RefreshCw, 
+  Send,
+  Loader2,
+  XCircle,
+  FileCheck
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { GlassCard } from '@/components/ui/glass-card';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface EvidenceItem {
-  evidence_type: string;
-  label: string;
-  required: boolean;
-  uploaded: boolean;
-  file_url?: string;
-}
-
-interface MapTask {
-  map_id: string;
-  title: string;
-  status: string;
-  risk_level: 'critical' | 'high' | 'medium' | 'low';
-  deadline: string;
-  days_until_deadline: number;
-  is_overdue: boolean;
-  evidence_completion_pct: number;
-  department_name?: string;
-  owner_department_id: string;
-  description?: string;
-  evidence_items?: EvidenceItem[];
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-const riskColor: Record<string, string> = {
-  critical: 'bg-red-100 text-red-700 border-red-200',
-  high:     'bg-orange-100 text-orange-700 border-orange-200',
-  medium:   'bg-amber-100 text-amber-700 border-amber-200',
-  low:      'bg-green-100 text-green-700 border-green-200',
-};
-
-const statusColor: Record<string, string> = {
-  open:        'bg-blue-100 text-blue-700',
-  in_progress: 'bg-purple-100 text-purple-700',
-  complete:    'bg-emerald-100 text-emerald-700',
-  escalated:   'bg-red-100 text-red-700',
-  approved:    'bg-indigo-100 text-indigo-700',
-};
-
-function DeadlinePill({ days, overdue }: { days: number; overdue: boolean }) {
-  if (overdue) return (
-    <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
-      <AlertTriangle className="w-3 h-3" /> OVERDUE {Math.abs(days)}d
-    </span>
-  );
-  if (days <= 3) return (
-    <span className="flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
-      <Clock className="w-3 h-3" /> {days}d left
-    </span>
-  );
-  return (
-    <span className="flex items-center gap-1 text-xs text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5">
-      <Clock className="w-3 h-3" /> {days}d left
-    </span>
-  );
-}
-
-// ─── Evidence Upload Panel ────────────────────────────────────────────────────
-function EvidencePanel({ task, onRefresh }: { task: MapTask; onRefresh: () => void }) {
-  const { user } = useAuth();
-  const [items, setItems] = useState<EvidenceItem[]>(task.evidence_items ?? []);
-  const [uploading, setUploading] = useState<Record<number, boolean>>({});
-  const [completing, setCompleting] = useState(false);
-  const [toast, setToast] = useState('');
-  const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Reload evidence when task changes
-  useEffect(() => {
-    apiClient.get(`/api/maps/${task.map_id}`)
-      .then(r => setItems(r.data.evidence_items ?? []))
-      .catch(() => {});
-  }, [task.map_id]);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
-
-  const handleUpload = async (idx: number, file: File) => {
-    setUploading(prev => ({ ...prev, [idx]: true }));
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      await apiClient.post(`/api/maps/${task.map_id}/evidence/${idx}`, form);
-      // optimistic update
-      setItems(prev => prev.map((e, i) => i === idx ? { ...e, uploaded: true } : e));
-      showToast('✅ Proof uploaded successfully!');
-      onRefresh();
-    } catch {
-      showToast('❌ Upload failed. Please try again.');
-    } finally {
-      setUploading(prev => ({ ...prev, [idx]: false }));
-    }
-  };
-
-  const handleComplete = async () => {
-    setCompleting(true);
-    try {
-      await apiClient.patch(`/api/maps/${task.map_id}/complete`, { emp_id: user?.empId });
-      showToast('🎉 Task marked as complete!');
-      onRefresh();
-    } catch {
-      showToast('❌ Could not mark complete. Upload all required proofs first.');
-    } finally {
-      setCompleting(false);
-    }
-  };
-
-  const allRequired = items.filter(e => e.required);
-  const allUploaded = allRequired.every(e => e.uploaded);
-
-  return (
-    <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
-      {/* Toast */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="text-sm font-medium text-center py-2 rounded-lg bg-slate-800 text-white"
-          >
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {items.length === 0 && (
-        <p className="text-sm text-slate-400 italic">No evidence items required for this task.</p>
-      )}
-
-      {items.map((item, idx) => (
-        <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
-          <div className="flex items-center gap-2 min-w-0">
-            {item.uploaded
-              ? <FileCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-              : <Upload className="w-4 h-4 text-slate-400 shrink-0" />
-            }
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-700 truncate">{item.label}</p>
-              {item.uploaded && item.file_url && (
-                <a href={item.file_url} target="_blank" rel="noreferrer"
-                   className="text-xs text-canara-blue hover:underline">
-                  View uploaded proof
-                </a>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {item.required && (
-              <span className="text-xs text-red-500 font-semibold">Required</span>
-            )}
-            {item.uploaded ? (
-              <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full font-semibold">
-                Uploaded ✓
-              </span>
-            ) : (
-              <>
-                <input
-                  type="file"
-                  ref={el => { fileRefs.current[idx] = el; }}
-                  className="hidden"
-                  onChange={e => {
-                    const f = e.target.files?.[0];
-                    if (f) handleUpload(idx, f);
-                  }}
-                />
-                <button
-                  onClick={() => fileRefs.current[idx]?.click()}
-                  disabled={uploading[idx]}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-canara-blue text-white rounded-lg hover:bg-canara-blue/90 disabled:opacity-50 transition-colors"
-                >
-                  {uploading[idx] ? (
-                    <><Loader2 className="w-3 h-3 animate-spin" /> Uploading...</>
-                  ) : (
-                    <><Upload className="w-3 h-3" /> Upload</>
-                  )}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      ))}
-
-      {/* Mark complete */}
-      {task.status !== 'complete' && (
-        <button
-          onClick={handleComplete}
-          disabled={completing || (!allUploaded && allRequired.length > 0)}
-          className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-            allUploaded || allRequired.length === 0
-              ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-200'
-              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-          }`}
-        >
-          {completing ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
-          ) : (
-            <><CheckCircle className="w-4 h-4" /> Mark Task as Complete</>
-          )}
-        </button>
-      )}
-      {!allUploaded && allRequired.length > 0 && task.status !== 'complete' && (
-        <p className="text-xs text-center text-slate-400">
-          Upload all required proofs to enable completion.
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ─── Task Card ────────────────────────────────────────────────────────────────
-function TaskCard({ task, onRefresh }: { task: MapTask; onRefresh: () => void }) {
-  const [expanded, setExpanded] = useState(false);
-  const pct = task.evidence_completion_pct;
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`bg-white rounded-2xl shadow-sm border-2 transition-colors ${
-        task.is_overdue ? 'border-red-200' : task.status === 'complete' ? 'border-emerald-200' : 'border-slate-200'
-      }`}
-    >
-      <div className="p-5">
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <h3 className="font-bold text-slate-800 text-base leading-tight line-clamp-2">
-            {task.title}
-          </h3>
-          <DeadlinePill days={task.days_until_deadline} overdue={task.is_overdue} />
-        </div>
-
-        {/* Badges */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${riskColor[task.risk_level]}`}>
-            {task.risk_level.charAt(0).toUpperCase() + task.risk_level.slice(1)} Risk
-          </span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${statusColor[task.status] ?? 'bg-slate-100 text-slate-600'}`}>
-            {task.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
-          </span>
-          {task.department_name && (
-            <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600">
-              {task.department_name}
-            </span>
-          )}
-        </div>
-
-        {/* Evidence progress */}
-        {(task.evidence_items?.length ?? 0) > 0 && (
-          <div className="mb-3">
-            <div className="flex justify-between text-xs text-slate-500 mb-1">
-              <span>Evidence uploaded</span>
-              <span className="font-semibold">{pct}%</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  pct === 100 ? 'bg-emerald-500' : pct > 50 ? 'bg-amber-400' : 'bg-red-400'
-                }`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Expand toggle */}
-        {task.status !== 'complete' && (
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold text-canara-blue hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            {expanded ? <><ChevronUp className="w-4 h-4" /> Hide Details</> : <><ChevronDown className="w-4 h-4" /> Upload Proof & Complete</>}
-          </button>
-        )}
-
-        {task.status === 'complete' && (
-          <div className="flex items-center gap-2 justify-center py-2 text-emerald-600 font-semibold text-sm">
-            <CheckCircle className="w-4 h-4" /> Completed
-          </div>
-        )}
-      </div>
-
-      {/* Evidence panel */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="px-5 pb-5">
-              <EvidencePanel task={task} onRefresh={onRefresh} />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-// ─── Dashboard ────────────────────────────────────────────────────────────────
 export function EmployeeDashboard() {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<MapTask[]>([]);
+  const [gaps, setGaps] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'all' | 'open' | 'in_progress' | 'complete'>('all');
+
+  // Selected gap for fixing
+  const [selectedGap, setSelectedGap] = useState<any | null>(null);
+  const [fixedText, setFixedText] = useState('');
+  const [fixedFile, setFixedFile] = useState<File | null>(null);
+  
+  // Submit fix feedback
+  const [submitting, setSubmitting] = useState(false);
+  const [recheckResult, setRecheckResult] = useState<any | null>(null);
+
+  // Regression check state
+  const [checkingRegressions, setCheckingRegressions] = useState(false);
+  const [regressionCheckResult, setRegressionCheckResult] = useState<any | null>(null);
+
+  // Message notifications
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const fetchTasks = async () => {
     if (!user?.empId) return;
     setLoading(true);
-    setError('');
     try {
-      const res = await apiClient.get(`/api/maps?assignee=${user.empId}&page_size=100`);
-      // For each task fetch evidence detail
-      const items: MapTask[] = await Promise.all(
-        (res.data.items as MapTask[]).map(async (t) => {
-          try {
-            const detail = await apiClient.get(`/api/maps/${t.map_id}`);
-            return { ...t, evidence_items: detail.data.evidence_items ?? [] };
-          } catch {
-            return t;
-          }
-        })
-      );
-      setTasks(items);
-    } catch {
-      setError('Could not load your tasks. Please try again.');
+      const res = await apiClient.get(`/api/gaps/employee/${user.empId}`);
+      setGaps(res.data);
+      
+      const notifRes = await apiClient.get('/api/gaps/notifications');
+      setNotifications(notifRes.data);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchTasks(); }, [user?.empId]);
+  useEffect(() => {
+    fetchTasks();
+  }, [user?.empId]);
 
-  const filtered = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
-
-  const stats = {
-    total: tasks.length,
-    open: tasks.filter(t => t.status === 'open').length,
-    inProgress: tasks.filter(t => t.status === 'in_progress').length,
-    overdue: tasks.filter(t => t.is_overdue).length,
-    complete: tasks.filter(t => t.status === 'complete').length,
+  const triggerToast = (msg: string, isError = false) => {
+    if (isError) {
+      setErrorMsg(msg);
+      setSuccessMsg('');
+    } else {
+      setSuccessMsg(msg);
+      setErrorMsg('');
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-6">
+  const handleSelectGap = async (gap: any) => {
+    setSelectedGap(gap);
+    setRecheckResult(null);
+    setRegressionCheckResult(null);
+    setFixedFile(null);
+    
+    // Attempt to seed text area with the target policy's current content
+    try {
+      const res = await apiClient.get(`/api/admin/policies/`);
+      const targetPolicy = res.data.find((p: any) => p.policy_id === gap.top_policy_id);
+      if (targetPolicy) {
+        setFixedText(targetPolicy.content);
+      } else {
+        setFixedText('');
+      }
+    } catch {
+      setFixedText('');
+    }
+  };
 
+  const handleCheckRegressions = async () => {
+    if (!selectedGap) return;
+    if (!fixedText.trim()) {
+      triggerToast('Please type updated policy text in the editor first.', true);
+      return;
+    }
+    setCheckingRegressions(true);
+    setRegressionCheckResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('updated_text', fixedText);
+      const res = await apiClient.post(`/api/gaps/employee/gaps/${selectedGap.gap_id}/check-regression`, formData);
+      setRegressionCheckResult(res.data);
+      if (res.data.original_resolved) {
+        if (res.data.has_regressions) {
+          triggerToast('Original gap resolved, but regressions were detected!', true);
+        } else {
+          triggerToast('Compliance check passed! No regressions detected.');
+        }
+      } else {
+        triggerToast('Original gap is still not resolved.', true);
+      }
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Regression check failed', true);
+    } finally {
+      setCheckingRegressions(false);
+    }
+  };
+
+  const handleSubmitFix = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGap) return;
+    setSubmitting(true);
+    setRecheckResult(null);
+
+    const formData = new FormData();
+    if (fixedFile) {
+      formData.append('file', fixedFile);
+    } else if (fixedText) {
+      formData.append('updated_text', fixedText);
+    } else {
+      triggerToast('Please upload a policy file or provide revised policy text.', true);
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await apiClient.post(`/api/gaps/${selectedGap.gap_id}/submit-fix`, formData);
+      const data = res.data;
+      
+      setRecheckResult(data);
+      if (data.resolved) {
+        triggerToast('Compliance check passed! Gap has been successfully resolved and sent to HOD/Admin.');
+        fetchTasks();
+        setSelectedGap(null);
+      } else {
+        triggerToast('Compliance check failed. Guideline mismatches are still present in the updated text.', true);
+      }
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Fix submission failed', true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getDueColorClass = (dueDateStr: string) => {
+    const due = new Date(dueDateStr);
+    const today = new Date();
+    // Reset hours to compare calendar days
+    due.setHours(0,0,0,0);
+    today.setHours(0,0,0,0);
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return 'border-red-500/40 hover:border-red-500 bg-red-950/20 text-red-200';
+    } else if (diffDays <= 2) {
+      return 'border-amber-500/40 hover:border-amber-500 bg-amber-950/20 text-amber-200';
+    } else {
+      return 'border-emerald-500/40 hover:border-emerald-500 bg-emerald-950/20 text-emerald-200';
+    }
+  };
+
+  const activeTasks = gaps.filter(g => g.triage_status === 'assigned');
+  const completedTasks = gaps.filter(g => g.triage_status === 'resolved');
+
+  return (
+    <div className="space-y-6 max-w-[1600px] mx-auto pb-10 px-4">
       {/* Header */}
-      <div className="max-w-5xl mx-auto mb-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800">
-              👋 My Compliance Tasks
-            </h1>
-            <p className="text-slate-500 mt-1">
-              Welcome back, <span className="font-semibold text-slate-700">{user?.name ?? user?.empId}</span>
-              {user?.department && ` · ${user.department}`}
-            </p>
-          </div>
-          <button
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-cyan/15 pb-4">
+        <div>
+          <h1 className="text-2xl font-bold font-mono tracking-wider text-cyber-cyan flex items-center gap-2">
+            <CheckCircle className="w-6 h-6 text-cyber-cyan animate-pulse-glow" />
+            MY COMPLIANCE TASKS
+          </h1>
+          <p className="text-xs text-slate-400 font-mono mt-1">
+            Welcome back, <span className="font-semibold text-slate-200">{user?.name || user?.empId}</span>. Review assigned gaps and submit policy fixes.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button 
             onClick={fetchTasks}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 shadow-sm transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-cyber-cyan/35 hover:border-cyber-cyan bg-obsidian-950 hover:bg-cyber-cyan/5 rounded text-xs font-mono text-cyber-cyan"
           >
-            <RefreshCw className="w-4 h-4" /> Refresh
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh Task List
           </button>
         </div>
       </div>
 
-      {/* Stats bar */}
-      <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: 'Total Tasks', value: stats.total, color: 'from-blue-500 to-canara-blue', icon: '📋' },
-          { label: 'Overdue', value: stats.overdue, color: 'from-red-500 to-rose-600', icon: '⏰' },
-          { label: 'In Progress', value: stats.inProgress, color: 'from-purple-500 to-purple-700', icon: '🔄' },
-          { label: 'Completed', value: stats.complete, color: 'from-emerald-500 to-green-600', icon: '✅' },
-        ].map(s => (
-          <div key={s.label} className={`bg-gradient-to-br ${s.color} text-white rounded-2xl p-4 shadow-sm`}>
-            <div className="text-3xl mb-1">{s.icon}</div>
-            <div className="text-2xl font-bold">{s.value}</div>
-            <div className="text-sm opacity-80">{s.label}</div>
-          </div>
-        ))}
+      {/* KPI Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <GlassCard className="p-5 border-cyber-cyan/15">
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Assigned Gaps</span>
+          <h3 className="text-3xl font-bold font-mono text-cyber-cyan mt-1">{activeTasks.length}</h3>
+        </GlassCard>
+        <GlassCard className="p-5 border-cyber-green/15">
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Resolved Gaps</span>
+          <h3 className="text-3xl font-bold font-mono text-cyber-green mt-1">{completedTasks.length}</h3>
+        </GlassCard>
+        <GlassCard className="p-5 border-cyber-magenta/15">
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Department Notifications</span>
+          <h3 className="text-3xl font-bold font-mono text-cyber-magenta mt-1">{notifications.length}</h3>
+        </GlassCard>
       </div>
 
-      {/* Filter tabs */}
-      <div className="max-w-5xl mx-auto mb-6 flex gap-2">
-        {(['all', 'open', 'in_progress', 'complete'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              filter === f
-                ? 'bg-canara-blue text-white shadow-md'
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            {f === 'all' ? 'All' : f === 'in_progress' ? 'In Progress' : f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
-      </div>
+      {/* Main split view */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        
+        {/* Left Side: Tasks queue and alerts */}
+        <div className="xl:col-span-1 space-y-6">
+          {/* Tasks List */}
+          <GlassCard className="p-5 border-cyber-cyan/10">
+            <h3 className="text-xs font-bold font-mono text-cyber-cyan uppercase border-b border-cyber-cyan/10 pb-2 mb-3">
+              Assigned Gaps Ledger
+            </h3>
+            
+            {loading ? (
+              <div className="text-center py-10 font-mono text-xs text-slate-400 animate-pulse">Syncing tasks...</div>
+            ) : activeTasks.length === 0 ? (
+              <div className="text-center py-12 font-mono text-xs text-slate-500">🎉 No pending compliance tasks! You are fully compliant.</div>
+            ) : (
+              <div className="space-y-3">
+                {activeTasks.map(gap => (
+                  <div 
+                    key={gap.gap_id}
+                    onClick={() => handleSelectGap(gap)}
+                    className={`p-3 border rounded-lg cursor-pointer transition-all hover:scale-[1.01] ${getDueColorClass(gap.due_date)} ${
+                      selectedGap?.gap_id === gap.gap_id ? 'ring-2 ring-cyber-cyan shadow-glow-cyan' : ''
+                    }`}
+                  >
+                    <div className="flex justify-between items-start font-mono text-xs">
+                      <span className="text-cyber-magenta font-bold">{gap.gap_id}</span>
+                      <span className="text-slate-400 flex items-center gap-1 font-semibold"><Clock className="w-3 h-3" /> {new Date(gap.due_date).toLocaleDateString()}</span>
+                    </div>
+                    {/* Due Date Status Badge */}
+                    {(() => {
+                      const due = new Date(gap.due_date);
+                      const today = new Date();
+                      due.setHours(0,0,0,0);
+                      today.setHours(0,0,0,0);
+                      const diffTime = due.getTime() - today.getTime();
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      if (diffDays < 0) {
+                        return <span className="inline-block text-[8px] font-bold text-red-400 bg-red-500/10 border border-red-500/25 px-1 py-0.5 rounded mt-1 font-mono uppercase">OVERDUE</span>;
+                      } else if (diffDays <= 2) {
+                        return <span className="inline-block text-[8px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1 py-0.5 rounded mt-1 font-mono uppercase">DUE SOON</span>;
+                      } else {
+                        return <span className="inline-block text-[8px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1 py-0.5 rounded mt-1 font-mono uppercase">ON TRACK</span>;
+                      }
+                    })()}
+                    <h4 className="text-slate-100 font-bold text-xs mt-1.5 truncate" title={gap.top_policy_title}>Target: {gap.top_policy_title}</h4>
+                    <p className="text-[10px] text-slate-300 line-clamp-2 mt-1 leading-normal font-sans">{gap.mismatch_description || gap.clause_text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </GlassCard>
 
-      {/* Content */}
-      <div className="max-w-5xl mx-auto">
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
-            <Loader2 className="w-8 h-8 animate-spin" />
-            <span className="text-sm">Loading your tasks...</span>
-          </div>
-        )}
+          {/* Notifications feed */}
+          <GlassCard className="p-5 border-cyber-cyan/10">
+            <h3 className="text-xs font-bold font-mono text-cyber-cyan uppercase border-b border-cyber-cyan/10 pb-2 mb-3">
+              My Alerts & Logs
+            </h3>
+            <div className="space-y-3 font-mono text-[10px] max-h-[200px] overflow-y-auto scrollbar-none">
+              {notifications.length === 0 ? (
+                <p className="text-slate-500 italic">No logs recorded.</p>
+              ) : (
+                notifications.map((notif, idx) => (
+                  <div key={idx} className="p-2.5 bg-obsidian-950/40 rounded border border-cyber-cyan/5">
+                    <p className="text-cyber-cyan font-bold uppercase">{notif.title}</p>
+                    <p className="text-slate-400 mt-0.5">{notif.message}</p>
+                    <span className="text-slate-600 block mt-1">{new Date(notif.created_at).toLocaleDateString()}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </GlassCard>
+        </div>
 
-        {!loading && error && (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <XCircle className="w-10 h-10 text-red-400" />
-            <p className="text-red-600 font-medium">{error}</p>
-            <button onClick={fetchTasks} className="px-4 py-2 bg-canara-blue text-white rounded-lg text-sm hover:bg-canara-blue/90">
-              Try Again
-            </button>
-          </div>
-        )}
+        {/* Right Side: Fix Workspace */}
+        <div className="xl:col-span-2">
+          {selectedGap ? (
+            <GlassCard className="p-6 border-cyber-cyan/15 space-y-4">
+              <div className="border-b border-cyber-cyan/10 pb-3">
+                <span className="text-[10px] font-mono text-slate-500 uppercase font-bold">Workspace // Fixing</span>
+                <h2 className="text-base font-bold font-mono text-cyber-cyan mt-0.5">{selectedGap.gap_id} in {selectedGap.top_policy_title}</h2>
+              </div>
 
-        {!loading && !error && filtered.length === 0 && (
-          <div className="text-center py-24 text-slate-400">
-            <div className="text-5xl mb-3">🎉</div>
-            <p className="text-lg font-medium text-slate-600">
-              {filter === 'all' ? 'No tasks assigned to you yet.' : `No ${filter.replace('_', ' ')} tasks.`}
-            </p>
-            <p className="text-sm mt-1">Check back later or contact your Compliance Officer.</p>
-          </div>
-        )}
+              {/* Feedback messages */}
+              {successMsg && (
+                <div className="p-3 bg-emerald-950/30 border border-emerald-500/40 text-emerald-400 text-xs font-mono rounded flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                  {successMsg.toUpperCase()}
+                </div>
+              )}
+              {errorMsg && (
+                <div className="p-3 bg-red-950/30 border border-red-500/40 text-red-400 text-xs font-mono rounded flex items-center gap-2">
+                  <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  {errorMsg.toUpperCase()}
+                </div>
+              )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {!loading && filtered.map(task => (
-            <TaskCard key={task.map_id} task={task} onRefresh={fetchTasks} />
-          ))}
+              {/* Guideline Mismatch details (Side-by-Side Workspace) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3.5 bg-obsidian-950 border border-cyber-cyan/15 rounded-lg text-xs font-mono leading-normal h-full">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold">RBI Guideline Clause (Page {selectedGap.page_number}):</p>
+                  <p className="text-slate-300 mt-1.5 leading-relaxed font-sans">{selectedGap.clause_text}</p>
+                </div>
+                <div className="p-3.5 bg-obsidian-950 border border-cyber-magenta/15 rounded-lg text-xs font-mono leading-normal h-full">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold">Detected Policy Gap / Mismatch:</p>
+                  <p className="text-cyber-magenta font-bold mt-1.5 leading-relaxed font-sans">{selectedGap.mismatch_description || selectedGap.classification_reason}</p>
+                </div>
+              </div>
+
+              {/* Upload or Inline text Form */}
+              <form onSubmit={handleSubmitFix} className="space-y-4 font-mono text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* File Upload Option */}
+                  <div className="border border-dashed border-cyber-cyan/25 hover:border-cyber-cyan/60 p-4 rounded-xl flex flex-col items-center justify-center bg-obsidian-950/20 cursor-pointer">
+                    <Upload className="w-6 h-6 text-slate-400 mb-1" />
+                    <span className="text-[10px] font-bold text-slate-400">Upload Updated Policy File</span>
+                    <input 
+                      type="file" 
+                      accept=".pdf,.txt,.docx" 
+                      onChange={(e) => setFixedFile(e.target.files?.[0] || null)}
+                      className="mt-2 text-slate-400 text-[10px]"
+                    />
+                    <span className="text-[8px] text-slate-600 mt-1">PDF, DOCX, TXT</span>
+                  </div>
+
+                  {/* Inline text area info */}
+                  <div className="p-4 bg-obsidian-950/40 border border-cyber-cyan/5 rounded-xl flex flex-col justify-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Compliance Verification Checklist:</p>
+                    <ul className="list-disc list-inside text-[9px] text-slate-500 space-y-1 mt-1.5 leading-relaxed">
+                      <li>Review the RBI clause mismatch</li>
+                      <li>Incorporate correct terminology/values</li>
+                      <li>Upload document or paste text below</li>
+                      <li>Submit to trigger re-verification</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {fixedFile && (
+                  <p className="text-cyber-green text-[10px] font-bold">Using file: {fixedFile.name} (This will overwrite editor text)</p>
+                )}
+
+                {/* Inline Editor */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Edit Policy Content Directly</label>
+                  <textarea
+                    value={fixedText}
+                    onChange={(e) => {
+                      setFixedText(e.target.value);
+                      if (fixedFile) setFixedFile(null); // Clear file if text edited
+                    }}
+                    rows={8}
+                    className="w-full p-3 bg-obsidian-950 border border-cyber-cyan/20 focus:border-cyber-cyan rounded-lg text-slate-200 outline-none font-sans leading-relaxed"
+                    placeholder="Paste or write the entire updated policy here..."
+                    required={!fixedFile}
+                  />
+                </div>
+
+                {recheckResult && !recheckResult.resolved && (
+                  <div className="p-3 bg-red-950/20 border border-red-500/30 text-red-400 text-xs rounded-lg font-mono">
+                    <p className="font-bold flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> RE-VERIFICATION FAILURE</p>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5 text-[10px]">
+                      {recheckResult.remaining_gaps.map((g: string, i: number) => (
+                        <li key={i}>{g}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {regressionCheckResult && (
+                  <div className={`p-3.5 border rounded-lg font-mono text-xs ${
+                    regressionCheckResult.original_resolved && !regressionCheckResult.has_regressions
+                      ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-400'
+                      : 'bg-red-950/20 border-red-500/40 text-red-400'
+                  }`}>
+                    <p className="font-bold uppercase tracking-wider">
+                      Regression Check Status // Score: {(regressionCheckResult.original_score * 100).toFixed(1)}%
+                    </p>
+                    <p className="mt-1">
+                      Original Gap Resolution: {regressionCheckResult.original_resolved ? "✅ SUCCESS" : "❌ FAILED"}
+                    </p>
+                    {regressionCheckResult.has_regressions ? (
+                      <div className="mt-2 text-red-400 font-sans leading-normal">
+                        <p className="font-bold font-mono text-[10px] text-red-500 uppercase">⚠️ Regressions Introduced:</p>
+                        <ul className="list-disc list-inside space-y-1 mt-1 text-[10px]">
+                          {regressionCheckResult.regressions.map((reg: any, i: number) => (
+                            <li key={i}>
+                              <strong>{reg.circular_title}</strong>: "{reg.clause_text}" (Similarity drops to {(reg.score * 100).toFixed(1)}%)
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      regressionCheckResult.original_resolved && (
+                        <p className="text-emerald-400 mt-1">✅ Verified: No regulatory regressions introduced.</p>
+                      )
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-2 justify-end flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => { 
+                      setSelectedGap(null); 
+                      setRecheckResult(null); 
+                      setRegressionCheckResult(null); 
+                    }}
+                    className="px-4 py-2 bg-obsidian-900 border border-slate-700 text-slate-300 rounded font-bold hover:bg-slate-800 transition-colors"
+                  >
+                    Close Workspace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCheckRegressions}
+                    disabled={checkingRegressions || submitting || !fixedText}
+                    className="px-4 py-2 bg-obsidian-950 border border-amber-500/40 hover:border-amber-500 text-amber-400 rounded font-bold transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {checkingRegressions ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-amber-400" />
+                    )}
+                    Check Regressions
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 bg-gradient-to-r from-cyber-cyan to-cyber-blue text-obsidian-950 font-bold rounded hover:shadow-glow-cyan transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {submitting ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Verifying Revisions...</>
+                    ) : (
+                      <><Send className="w-4 h-4" /> Submit Fix</>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </GlassCard>
+          ) : (
+            <GlassCard className="p-12 border-cyber-cyan/5 flex flex-col items-center justify-center text-center h-[400px]">
+              <FileCheck className="w-16 h-16 text-slate-600 mb-4 animate-pulse-glow" />
+              <h3 className="text-slate-300 font-bold font-mono">WORKSPACE EMPTY</h3>
+              <p className="text-xs text-slate-500 font-mono mt-1 max-w-sm">Select an assigned compliance gap from the left ledger to review revisions and submit policy fixes.</p>
+            </GlassCard>
+          )}
         </div>
       </div>
     </div>

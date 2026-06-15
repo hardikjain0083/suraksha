@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from database import db
 from datetime import datetime
 import uuid
+import io
 import sys
 sys.path.insert(0, ".")
 from services.watcher import process_circular, extract_pdf_robust, get_embedder, generate_embeddings
@@ -36,13 +37,38 @@ async def upload_policy(
     database = get_db()
     file_bytes = await file.read()
     
-    # Simple extraction
+    # Extract text based on file type
     ext = file.filename.rsplit(".", 1)[-1].lower()
     text = ""
     
     if ext == "pdf":
         res = await extract_pdf_robust(file_bytes)
         text = res.text
+    elif ext in ("docx",):
+        try:
+            from docx import Document
+            doc = Document(io.BytesIO(file_bytes))
+            text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to extract text from DOCX: {str(e)}")
+    elif ext in ("doc",):
+        # Try antiword or fallback to raw text extraction for legacy .doc
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["antiword", "-"],
+                input=file_bytes, capture_output=True, timeout=10
+            )
+            if result.returncode == 0:
+                text = result.stdout.decode("utf-8", errors="ignore")
+            else:
+                # Fallback: try treating as docx
+                from docx import Document
+                doc = Document(io.BytesIO(file_bytes))
+                text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+        except Exception:
+            # Last resort: decode bytes
+            text = file_bytes.decode("utf-8", errors="ignore")
     else:
         text = file_bytes.decode("utf-8", errors="ignore")
         
@@ -81,6 +107,25 @@ async def archive_policy(policy_id: str):
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail='Policy not found')
     return {'status': 'success', 'message': 'Policy archived'}
+
+@router.patch('/{policy_id}/unarchive')
+async def unarchive_policy(policy_id: str):
+    database = get_db()
+    res = await database.policies.update_one(
+        {'policy_id': policy_id},
+        {'$set': {'status': 'active', 'valid_until': None}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail='Policy not found')
+    return {'status': 'success', 'message': 'Policy unarchived'}
+
+@router.delete('/{policy_id}')
+async def delete_policy(policy_id: str):
+    database = get_db()
+    res = await database.policies.delete_one({'policy_id': policy_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail='Policy not found')
+    return {'status': 'success', 'message': 'Policy deleted'}
 
 @router.patch('/{policy_id}')
 async def update_policy(policy_id: str, title: str = Form(None), version: str = Form(None), department: str = Form(None)):

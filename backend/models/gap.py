@@ -57,17 +57,35 @@ class GapDetectionResponse(BaseModel):
 class GapQueueEntry(BaseModel):
     gap_id: str
     circular_id: str
-    clause_number: Optional[str]
+    circular_title: Optional[str] = None
+    clause_number: Optional[str] = None
     clause_text: str
-    obligation_type: Optional[str]
-    severity: Optional[str]
+    obligation_type: Optional[str] = None
+    severity: Optional[str] = None
     gap_status: str
-    similarity_score: Optional[float]
-    top_policy_id: Optional[str]
-    top_policy_title: Optional[str]
+    similarity_score: Optional[float] = None
+    top_policy_id: Optional[str] = None
+    top_policy_title: Optional[str] = None
     classification_reason: str
     routing: str
-    triage_status: str = "new"  # new | assigned | resolved | escalated | dismissed
+    triage_status: str = "assigned"  # assigned | resolved | cancelled | superseded
     created_at: datetime = Field(default_factory=datetime.utcnow)
     judge_explanation: List[JudgeExplanationStep] = []
     historical_match_count: int = 0
+    page_number: Optional[int] = 1
+    department_id: Optional[str] = None
+    assigned_hod: Optional[str] = None
+    assigned_employee: Optional[str] = None
+    due_date: Optional[datetime] = None
+    fixed_policy_content: Optional[str] = None
+    remaining_gaps: Optional[List[str]] = []
+    is_fixed: bool = False
+    
+    # Hardening additions
+    guideline_substance_hash: Optional[str] = None
+    supersedes_gap_id: Optional[str] = None
+    parent_guideline_id: Optional[str] = None
+    source: str = "circular_upload"  # circular_upload, fix_regression, manual
+    is_ambiguous: bool = False
+    ambiguous_departments: List[str] = []
+

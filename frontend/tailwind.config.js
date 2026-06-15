@@ -18,6 +18,8 @@ export default {
 
         // Cybersecurity Command Center Colors
         'obsidian': {
+          950: '#06091a',
+          955: '#040714',
           900: '#0a0e27',
           800: '#0f1333',
           700: '#141939',

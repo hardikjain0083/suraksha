@@ -11,7 +11,12 @@ import { MapDetailModal } from '../../components/maps/MapDetailModal';
 
 const STATUS_OPTIONS = ['draft', 'approved', 'open', 'in_progress', 'complete', 'rejected', 'escalated'];
 const RISK_OPTIONS = ['critical', 'high', 'medium', 'low'];
-const DEPT_OPTIONS = ['DEPT-INFOSEC', 'DEPT-IT', 'DEPT-COMPLIANCE', 'DEPT-LEGAL'];
+const DEPT_OPTIONS = [
+  'DEPT-COMPLIANCE', 'DEPT-LEGAL', 'DEPT-RISK', 'DEPT-OPS',
+  'DEPT-BRANCH-BANKING', 'DEPT-IT-CYBER', 'DEPT-FINANCE', 'DEPT-HR',
+  'DEPT-RECOVERY', 'DEPT-TREASURY', 'DEPT-SME-CREDIT',
+  'DEPT-SECURITY-VIGILANCE', 'DEPT-CUSTOMER-SERVICE', 'DEPT-MIS', 'DEPT-AUDIT',
+];
 
 export const MapsManagementPage = () => {
   const [items, setItems] = useState<MapListItem[]>([]);
@@ -182,21 +187,21 @@ export const MapsManagementPage = () => {
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Status</label>
-                <select className="mt-1 w-full border rounded-lg px-2 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <select className="mt-1 w-full border rounded-lg px-2 py-2 text-sm text-gray-900 bg-white" value={status} onChange={(e) => setStatus(e.target.value)}>
                   <option value="">All</option>
                   {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Department</label>
-                <select className="mt-1 w-full border rounded-lg px-2 py-2 text-sm" value={department} onChange={(e) => setDepartment(e.target.value)}>
+                <select className="mt-1 w-full border rounded-lg px-2 py-2 text-sm text-gray-900 bg-white" value={department} onChange={(e) => setDepartment(e.target.value)}>
                   <option value="">All</option>
                   {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Risk Level</label>
-                <select className="mt-1 w-full border rounded-lg px-2 py-2 text-sm" value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)}>
+                <select className="mt-1 w-full border rounded-lg px-2 py-2 text-sm text-gray-900 bg-white" value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)}>
                   <option value="">All</option>
                   {RISK_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -351,7 +356,7 @@ export const MapsManagementPage = () => {
                 <select
                   value={selectedEmpId}
                   onChange={e => setSelectedEmpId(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-canara-blue/40"
+                  className="w-full border rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-canara-blue/40"
                 >
                   <option value="">— Choose employee —</option>
                   {employees.map(e => (

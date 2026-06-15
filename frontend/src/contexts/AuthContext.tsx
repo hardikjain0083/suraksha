@@ -17,8 +17,8 @@ interface AuthContextValue {
   logout: () => void;
 }
 
-const ADMIN_ROLES = ['admin', 'compliance_officer', 'auditor'];
-const DEPT_ROLES = ['employee', 'department_head'];
+const ADMIN_ROLES = ['admin', 'compliance_officer', 'auditor', 'super_admin'];
+const DEPT_ROLES = ['employee', 'department_head', 'dept_head'];
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 

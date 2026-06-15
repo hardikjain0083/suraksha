@@ -2,9 +2,11 @@ import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────
 //  Single source of truth for the API base URL.
-//  Set VITE_API_URL in .env for production (e.g. https://api.railway.app)
+//  In development, Vite dev proxy routes /api → http://localhost:8000.
+//  In production (Vercel), set VITE_API_URL to your HuggingFace Space URL:
+//  e.g. https://<your-username>-<space-name>.hf.space
 // ─────────────────────────────────────────────────────────────
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 /** Build API path for circular IDs that contain slashes (e.g. SEBI/2026-DEMO-009). */
 export function circularApiPath(circularId: string, suffix = ''): string {
@@ -23,15 +25,19 @@ export const circularsApi = {
 // ─────────────────────────────────────────────────────────────
 export const apiClient = axios.create({
   baseURL: API_BASE,
-  timeout: 60_000,
+  timeout: 120_000,  // 2 minutes for large file uploads
   headers: { 'Content-Type': 'application/json' },
 });
 
-// ── Request interceptor: attach JWT ──────────────────────────
+// ── Request interceptor: attach JWT + fix FormData ────────────
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // CRITICAL: For FormData, let browser set Content-Type with correct multipart boundary
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
   }
   // Attach timestamp for duration calculation
   (config as any)._startTime = Date.now();
@@ -45,13 +51,26 @@ apiClient.interceptors.response.use(
 
     // Judge mode request logging (global window registry)
     if ((window as any).__JUDGE_MODE_ENABLED) {
+      let parsedBody = undefined;
+      if (response.config.data) {
+        if (typeof response.config.data === 'string') {
+          try {
+            parsedBody = JSON.parse(response.config.data);
+          } catch {
+            parsedBody = response.config.data;
+          }
+        } else {
+          parsedBody = '[Non-string data (e.g. FormData)]';
+        }
+      }
+
       const log: RequestLogEntry = {
         method: (response.config.method ?? 'GET').toUpperCase(),
         url: response.config.url ?? '',
         status: response.status,
         duration,
         timestamp: new Date().toISOString(),
-        requestBody: response.config.data ? JSON.parse(response.config.data) : undefined,
+        requestBody: parsedBody,
         responseBody: response.data,
       };
       const existing: RequestLogEntry[] = (window as any).__JUDGE_LOG ?? [];

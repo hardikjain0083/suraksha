@@ -1,330 +1,350 @@
 import re
 import uuid
 import time
+import hashlib
 import logging
-import asyncio
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from models.gap import (
-    GapCheckResult, GapDetectionResponse, GapQueueEntry,
-    PolicyMatch, KeywordComplianceResult, JudgeExplanationStep
-)
+from models.gap import GapCheckResult, GapDetectionResponse, GapQueueEntry, PolicyMatch, JudgeExplanationStep
+from sklearn.feature_extraction.text import TfidfVectorizer
+from difflib import SequenceMatcher
 
 logger = logging.getLogger(__name__)
 
-# ─────────────────────────────────────────────
-#  Structured Keyword Taxonomy (Enhancement #1)
-# ─────────────────────────────────────────────
-KEYWORD_TAXONOMY = {
-    "cryptography": {
-        "exact": ["AES-256", "AES-128", "SHA-256", "SHA-384", "RSA-2048", "TLS 1.3", "TLS 1.2"],
-        "fuzzy": ["encryption", "cipher", "cryptographic"],
-        "severity": "critical"
-    },
-    "authentication": {
-        "exact": ["MFA", "2FA", "multi-factor", "biometric", "hardware token", "OTP"],
-        "fuzzy": ["authenticate", "login", "access control"],
-        "severity": "critical"
-    },
-    "data_protection": {
-        "exact": ["DLP", "data loss prevention", "masking", "tokenization", "PII", "sensitive data"],
-        "fuzzy": ["data protection", "privacy", "anonymization"],
-        "severity": "high"
-    },
-    "network_security": {
-        "exact": ["firewall", "IDS", "IPS", "WAF", "DMZ", "VPN", "zero trust"],
-        "fuzzy": ["network segmentation", "perimeter"],
-        "severity": "high"
-    },
-    "monitoring": {
-        "exact": ["SIEM", "SOC", "real-time monitoring", "24x7", "24/7"],
-        "fuzzy": ["monitor", "alert", "log analysis"],
-        "severity": "medium"
-    },
-    "frequency": {
-        "exact": ["quarterly", "monthly", "weekly", "daily", "annual", "biannual"],
-        "fuzzy": ["periodic", "regular", "routine"],
-        "severity": "high"
-    },
-    "response_time": {
-        "exact": ["within 24 hours", "within 48 hours", "within 72 hours", "immediately", "without delay"],
-        "fuzzy": ["prompt", "timely", "expeditious"],
-        "severity": "high"
-    },
-    "audit": {
-        "exact": ["audit trail", "audit log", "immutable log", "tamper-evident"],
-        "fuzzy": ["audit", "review", "assessment"],
-        "severity": "medium"
-    },
-    "backup": {
-        "exact": ["backup", "disaster recovery", "DR", "BCP", "business continuity"],
-        "fuzzy": ["redundancy", "failover", "resilience"],
-        "severity": "medium"
-    },
-    "scanning": {
-        "exact": ["vulnerability scan", "penetration test", "pentest", "security assessment"],
-        "fuzzy": ["scan", "test", "assessment"],
-        "severity": "high"
+SIMILARITY_THRESHOLD_MATCH = 0.75
+SIMILARITY_THRESHOLD_PARTIAL = 0.65
+SIMILARITY_THRESHOLD_CLAUSE = 0.60
+
+# ─────────────────────────────────────────────────────────────
+#  Keyword Extractor (Custom RAKE implementation)
+# ─────────────────────────────────────────────────────────────
+
+class RakeKeywordExtractor:
+    def __init__(self):
+        self.stopwords = {
+            "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", 
+            "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", 
+            "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", 
+            "down", "during", "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", 
+            "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", 
+            "him", "himself", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", 
+            "isn't", "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", 
+            "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", 
+            "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", 
+            "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "their", "theirs", "them", 
+            "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", 
+            "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", 
+            "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "when", "when's", "where", 
+            "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", 
+            "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves",
+            "bank", "banks", "banking", "circular", "circulars", "rbi", "section", "annexure", "annexures", 
+            "herein", "thereof", "pursuant", "notwithstanding", "guidelines", "guideline", "direction", "directions",
+            "regulatory", "compliance"
+        }
+
+    def _is_number(self, s):
+        try:
+            float(s)
+            return True
+        except ValueError:
+            return False
+
+    def extract_keywords(self, text: str) -> List[str]:
+        if not text.strip():
+            return []
+        sentences = re.split(r'[,.!?;:\t\-\[\]\(\)\"\']', text.lower())
+        phrases = []
+        for s in sentences:
+            words = s.strip().split()
+            phrase = []
+            for w in words:
+                w_clean = re.sub(r'[^a-z0-9]', '', w)
+                if w_clean in self.stopwords or self._is_number(w_clean) or len(w_clean) <= 2:
+                    if phrase:
+                        phrases.append(phrase)
+                        phrase = []
+                else:
+                    phrase.append(w_clean)
+            if phrase:
+                phrases.append(phrase)
+                
+        word_freq = {}
+        word_degree = {}
+        for phrase in phrases:
+            degree = len(phrase) - 1
+            for word in phrase:
+                word_freq[word] = word_freq.get(word, 0) + 1
+                word_degree[word] = word_degree.get(word, 0) + degree
+                
+        for word in word_freq:
+            word_degree[word] = word_degree[word] + word_freq[word]
+            
+        word_scores = {}
+        for word in word_freq:
+            word_scores[word] = word_degree[word] / word_freq[word]
+            
+        phrase_scores = {}
+        for phrase in phrases:
+            phrase_str = " ".join(phrase)
+            score = 0
+            for word in phrase:
+                score += word_scores.get(word, 0)
+            phrase_scores[phrase_str] = score
+            
+        sorted_phrases = sorted(phrase_scores.items(), key=lambda x: x[1], reverse=True)
+        return [p[0] for p in sorted_phrases if p[0].strip()][:10]
+
+# ─────────────────────────────────────────────────────────────
+#  NLP Helper Functions
+# ─────────────────────────────────────────────────────────────
+
+def preprocess_text(text: str) -> List[str]:
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    stopwords = {
+        "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", 
+        "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", 
+        "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", 
+        "down", "during", "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", 
+        "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", 
+        "him", "himself", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", 
+        "isn't", "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", 
+        "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", 
+        "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", 
+        "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "their", "theirs", "them", 
+        "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", 
+        "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", 
+        "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "when", "when's", "where", 
+        "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", 
+        "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves",
+        "bank", "banks", "banking", "circular", "circulars", "rbi", "section", "annexure", "herein", "thereof", 
+        "pursuant", "notwithstanding", "guidelines", "guideline", "direction", "directions", "regulatory", "compliance"
     }
+    words = text.split()
+    tokens = []
+    for w in words:
+        if w in stopwords or len(w) <= 2:
+            continue
+        if w.endswith("ies") and not w.endswith("eies"):
+            w = w[:-3] + "y"
+        elif w.endswith("es") and not w.endswith("aes") and not w.endswith("ees") and not w.endswith("oes"):
+            w = w[:-2]
+        elif w.endswith("s") and not w.endswith("ss") and not w.endswith("us") and not w.endswith("is") and not w.endswith("as"):
+            w = w[:-1]
+        elif w.endswith("ing"):
+            w = w[:-3]
+        elif w.endswith("ed"):
+            w = w[:-2]
+        tokens.append(w)
+    return tokens
+
+def calculate_jaccard(set1: set, set2: set) -> float:
+    if not set1 or not set2:
+        return 0.0
+    intersection = len(set1.intersection(set2))
+    union = len(set1.union(set2))
+    return intersection / union
+
+def calculate_tfidf_cosine(text1: str, text2: str) -> float:
+    try:
+        vectorizer = TfidfVectorizer(tokenizer=preprocess_text, lowercase=True)
+        tfidf = vectorizer.fit_transform([text1, text2])
+        dot_prod = (tfidf[0] * tfidf[1].T).toarray()[0][0]
+        return float(dot_prod)
+    except Exception:
+        return 0.0
+
+def calculate_fuzzy_ratio(text1: str, text2: str) -> float:
+    return SequenceMatcher(None, text1, text2).ratio()
+
+def calculate_weighted_score(text1: str, text2: str, kws1: Any, kws2: Any) -> float:
+    tfidf_sim = calculate_tfidf_cosine(text1, text2)
+    jaccard_sim = calculate_jaccard(set(kws1), set(kws2))
+    fuzzy_sim = calculate_fuzzy_ratio(text1, text2)
+    return 0.4 * tfidf_sim + 0.3 * jaccard_sim + 0.3 * fuzzy_sim
+
+
+def normalize_guideline(text: str) -> str:
+    text = re.sub(r'Circular No\.\s*[A-Z0-9\-/]+', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'dated\s+[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'page\s+\d+', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s+', ' ', text).strip().lower()
+    return text
+
+def compute_substance_hash(text: str) -> str:
+    normalized = normalize_guideline(text)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+# ─────────────────────────────────────────────────────────────
+#  Severity & Applicability
+# ─────────────────────────────────────────────────────────────
+
+def parse_severity_and_deadline(text: str) -> tuple[str, int]:
+    severity = "medium"
+    days = 14
+    lower_text = text.lower()
+    
+    if "with immediate effect" in lower_text or "effective from date of circular" in lower_text:
+        severity = "critical"
+        days = 3
+    elif "within 30 days" in lower_text or "compliance within 30 days" in lower_text:
+        severity = "critical"
+        days = 30
+    elif "within 90 days" in lower_text or "quarterly" in lower_text:
+        severity = "high"
+        days = 90
+    elif "within 180 days" in lower_text or "may consider" in lower_text or "advised" in lower_text:
+        severity = "low"
+        days = 180
+    elif "within 1 year" in lower_text or "annual" in lower_text:
+        severity = "medium"
+        days = 365
+        
+    if severity == "medium":
+        if "shall" in lower_text or "must" in lower_text or "directed to" in lower_text:
+            severity = "critical"
+            days = 30
+        elif "should" in lower_text or "maintain" in lower_text:
+            severity = "high"
+            days = 90
+        elif "may" in lower_text or "recommended" in lower_text:
+            severity = "low"
+            days = 180
+            
+    return severity, days
+
+# ─────────────────────────────────────────────────────────────
+#  Routing Disambiguation
+# ─────────────────────────────────────────────────────────────
+
+DEPT_KEYWORDS = {
+    "DEPT-COMPLIANCE": ["kyc", "aml", "cft", "pmla", "customer identification", "due diligence", "suspicious transaction", "str"],
+    "DEPT-IT-CYBER": ["cybersecurity", "information security", "firewall", "encryption", "access control", "vulnerability", "penetration testing", "iso 27001", "mfa", "multi-factor authentication", "authentication", "login", "password"],
+    "DEPT-RISK": ["npa", "capital adequacy", "crar", "stress testing", "credit risk", "market risk", "operational risk", "basel"],
+    "DEPT-FINANCE": ["capital", "dividend", "reserves", "provisioning", "npa classification", "income recognition", "asset classification"],
+    "DEPT-OPS": ["customer grievance", "ombudsman", "turnaround time", "tat", "service standards", "branch operations", "cash management"],
+    "DEPT-SME-CREDIT": ["loan", "credit appraisal", "sanction", "disbursement", "collateral", "margin", "exposure limit", "concentration risk"],
+    "DEPT-HR": ["fit and proper", "director", "board", "kmp", "remuneration", "training", "certification"]
 }
 
-SIMILARITY_COVERED = 0.85
-SIMILARITY_SUSPECTED = 0.70
-HISTORICAL_AUTO_ROUTE_THRESHOLD = 3
 
-
-def check_keyword_compliance(clause_text: str, policy_text: str) -> dict[str, KeywordComplianceResult]:
-    """Layer 2: Structured syntactic keyword compliance check."""
-    results = {}
-    for category, rules in KEYWORD_TAXONOMY.items():
-        clause_lower = clause_text.lower()
-        policy_lower = policy_text.lower()
-
-        # Only evaluate categories that are mentioned in the clause
-        exact_in_clause = [kw for kw in rules["exact"] if kw.lower() in clause_lower]
-        fuzzy_in_clause = any(fw in clause_lower for fw in rules["fuzzy"])
-
-        if not exact_in_clause and not fuzzy_in_clause:
-            # This category is not relevant to this clause — skip
-            continue
-
-        policy_has = [kw for kw in exact_in_clause if kw.lower() in policy_lower]
-        policy_missing = [kw for kw in exact_in_clause if kw.lower() not in policy_lower]
+def route_department(circular_number: str, text: str, category_tag: str = "") -> tuple[str, bool, List[str]]:
+    from config import CIRCULAR_PREFIX_MAP
+    prefix_match = None
+    for prefix in CIRCULAR_PREFIX_MAP:
+        if circular_number.startswith(prefix) or prefix in circular_number:
+            prefix_match = CIRCULAR_PREFIX_MAP[prefix]
+            break
+            
+    dept_hints = []
+    if prefix_match:
+        dept_hints = prefix_match["dept_hint"]
         
-        fuzzy_covered = False
-        if not exact_in_clause and fuzzy_in_clause:
-            fuzzy_covered = any(fw in policy_lower for fw in rules["fuzzy"])
+    name_to_id = {
+        "Compliance": "DEPT-COMPLIANCE",
+        "IT Security": "DEPT-IT-CYBER",
+        "Risk Management": "DEPT-RISK",
+        "Finance": "DEPT-FINANCE",
+        "Operations": "DEPT-OPS",
+        "Credit": "DEPT-SME-CREDIT",
+        "HR": "DEPT-HR"
+    }
+    
+    text_lower = text.lower()
+    scores = {}
+    for dept_id, kws in DEPT_KEYWORDS.items():
+        score = sum(text_lower.count(kw) for kw in kws)
+        friendly_name = next((name for name, d_id in name_to_id.items() if d_id == dept_id), None)
+        if friendly_name and friendly_name in dept_hints:
+            score += 10
+        scores[dept_id] = score
+        
+    sorted_depts = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top_dept_id, top_score = sorted_depts[0]
+    second_dept_id, second_score = sorted_depts[1] if len(sorted_depts) > 1 else (None, 0)
+    
+    is_ambiguous = False
+    ambiguous_departments = []
+    
+    if second_dept_id and top_score > 0:
+        diff_pct = (top_score - second_score) / top_score
+        if diff_pct < 0.10 or (top_score == second_score and top_score > 0):
+            is_ambiguous = True
+            ambiguous_departments = [top_dept_id, second_dept_id]
+            
+    return top_dept_id, is_ambiguous, ambiguous_departments
 
-        passed = (len(policy_missing) == 0) and (len(exact_in_clause) > 0 or fuzzy_covered)
+# ─────────────────────────────────────────────────────────────
+#  Auto-Assignment with Availability Checks
+# ─────────────────────────────────────────────────────────────
 
-        results[category] = KeywordComplianceResult(
-            exact_found=exact_in_clause,
-            policy_has=policy_has,
-            policy_missing=policy_missing,
-            fuzzy_matched=fuzzy_in_clause,
-            severity=rules["severity"],
-            passed=passed
-        )
-    return results
+async def get_available_employee(db: Any, department_id: str) -> Optional[str]:
+    employees_cursor = db.users.find({
+        "department_id": department_id,
+        "role": "employee",
+        "status": "active"
+    })
+    employees = await employees_cursor.to_list(length=100)
+    if not employees:
+        return None
 
+    # Filter by availability and caps
+    available = [e for e in employees if e.get("availability_status", "available") == "available" and e.get("active_gap_count", 0) < e.get("max_concurrent_gaps", 5)]
+    if not available:
+        return None
+        
+    # Sort by active workload, then last assigned date
+    available.sort(key=lambda e: (e.get("active_gap_count", 0), e.get("last_assigned_date") or datetime.min))
+    return available[0]["emp_id"]
 
-def generate_explanation(policy_title: str, similarity: float, keyword_check: dict) -> str:
-    """Human-readable explanation for judge mode."""
-    parts = []
-    if similarity > SIMILARITY_COVERED:
-        parts.append(f"Strong semantic similarity ({similarity:.2f})")
-    elif similarity > SIMILARITY_SUSPECTED:
-        parts.append(f"Moderate semantic match ({similarity:.2f}) — needs review")
-    else:
-        parts.append(f"Weak semantic match ({similarity:.2f}) — likely gap")
+# ─────────────────────────────────────────────────────────────
+#  Engine Core Detection Execution
+# ─────────────────────────────────────────────────────────────
 
-    failed_cats = [k for k, v in keyword_check.items() if not v.passed]
-    if failed_cats:
-        parts.append(f"Missing keywords in: {', '.join(failed_cats)}")
-    else:
-        if keyword_check:
-            parts.append("All required keywords found in policy")
-
-    return " | ".join(parts)
-
-
-def build_judge_steps(
-    clause_text: str,
-    top_match: Optional[PolicyMatch],
-    keyword_check: dict,
-    historical_count: int,
-    final_status: str
-) -> list[JudgeExplanationStep]:
-    steps = []
-
-    # Step 1: Vector Search
-    sim = top_match.similarity if top_match else 0.0
-    steps.append(JudgeExplanationStep(
-        stage="vector_search",
-        title="1. Semantic Search",
-        technical_detail=f"$vectorSearch on Atlas index 'vector_index_policies' | numCandidates: 100 | limit: 5 | filter: {{status: 'active'}}",
-        business_impact=f"Found top match: '{top_match.title if top_match else 'None'}' with similarity {sim:.4f}",
-        result="pass" if top_match else "fail",
-        data={"top_match": top_match.policy_id if top_match else None, "similarity": sim}
-    ))
-
-    # Step 2: Semantic Threshold
-    sem_result = "pass" if sim >= SIMILARITY_COVERED else ("review" if sim >= SIMILARITY_SUSPECTED else "fail")
-    steps.append(JudgeExplanationStep(
-        stage="semantic_analysis",
-        title="2. Similarity Threshold",
-        technical_detail=f"Score {sim:.4f} vs thresholds: covered ≥ {SIMILARITY_COVERED}, suspected ≥ {SIMILARITY_SUSPECTED}, confirmed < {SIMILARITY_SUSPECTED}",
-        business_impact="Policy is semantically related — proceeding to keyword check" if sim >= SIMILARITY_SUSPECTED else "Weak semantic overlap — likely a genuine gap",
-        result=sem_result,
-        data={"threshold_covered": SIMILARITY_COVERED, "threshold_suspected": SIMILARITY_SUSPECTED, "actual": sim}
-    ))
-
-    # Step 3: Keyword Compliance
-    if keyword_check:
-        failed_cats = {k: v for k, v in keyword_check.items() if not v.passed}
-        passed_cats = {k: v for k, v in keyword_check.items() if v.passed}
-        missing_kws = [kw for v in failed_cats.values() for kw in v.policy_missing]
-        found_kws = [kw for v in passed_cats.values() for kw in v.policy_has]
-        kw_result = "fail" if failed_cats else "pass"
-        steps.append(JudgeExplanationStep(
-            stage="syntactic_check",
-            title="3. Keyword Compliance",
-            technical_detail=f"Taxonomy categories checked: {list(keyword_check.keys())} | Missing: {missing_kws} | Found: {found_kws}",
-            business_impact=f"Policy says 'industry-standard' but regulation mandates specific terms: {missing_kws}" if missing_kws else "All specific technical requirements explicitly covered in policy",
-            result=kw_result,
-            data={"missing": missing_kws, "found": found_kws, "categories_checked": list(keyword_check.keys())}
-        ))
-    else:
-        steps.append(JudgeExplanationStep(
-            stage="syntactic_check",
-            title="3. Keyword Compliance",
-            technical_detail="No specific technical keywords found in clause — taxonomy match skipped",
-            business_impact="Clause uses general language; semantic match is sufficient",
-            result="pass",
-            data={}
-        ))
-
-    # Step 4: Historical Pattern
-    hist_result = "pass" if historical_count >= HISTORICAL_AUTO_ROUTE_THRESHOLD else "review"
-    steps.append(JudgeExplanationStep(
-        stage="historical_match",
-        title="4. Historical Pattern",
-        technical_detail=f"db.gap_queue.count({{clause_text_similar, resolved}}) = {historical_count} | Auto-route threshold: {HISTORICAL_AUTO_ROUTE_THRESHOLD}",
-        business_impact=f"{'Similar gaps approved before → auto-routing' if historical_count >= HISTORICAL_AUTO_ROUTE_THRESHOLD else 'Novel gap — no historical precedent → human triage required'}",
-        result=hist_result,
-        data={"similar_count": historical_count, "auto_route_threshold": HISTORICAL_AUTO_ROUTE_THRESHOLD}
-    ))
-
-    return steps
-
-
-async def vector_search_policies(clause_embedding: list, db, clause_text: str, top_k: int = 5) -> list[PolicyMatch]:
-    """Run Atlas $vectorSearch on policies, enrich with keyword compliance."""
-    pipeline = [
-        {
-            "$vectorSearch": {
-                "index": "vector_index_policies",
-                "path": "embedding",
-                "queryVector": clause_embedding,
-                "numCandidates": 100,
-                "limit": top_k
-            }
-        },
-        {
-            "$match": {"status": "active"}
-        },
-        {
-            "$project": {
-                "policy_id": 1,
-                "title": 1,
-                "department_owner_id": 1,
-                "full_text": 1,
-                "content": 1,
-                "version": 1,
-                "score": {"$meta": "vectorSearchScore"},
-            }
-        }
-    ]
-
-    try:
-        raw = await asyncio.wait_for(
-            db.policies.aggregate(pipeline).to_list(length=top_k),
-            timeout=8.0,
-        )
-    except (asyncio.TimeoutError, Exception) as e:
-        logger.warning("$vectorSearch unavailable (%s). Falling back to deterministic manual-review scores.", e)
-        raw_cursor = db.policies.find({"status": "active"}).limit(top_k)
-        raw = await raw_cursor.to_list(length=top_k)
-        for r in raw:
-            r["score"] = 0.0
-
-    matches = []
-    for r in raw:
-        policy_text = r.get("full_text") or r.get("content") or ""
-        keyword_check = check_keyword_compliance(clause_text, policy_text)
-        overall_pass = all(v.passed for v in keyword_check.values()) if keyword_check else True
-        sim = round(float(r.get("score", 0.0)), 4)
-
-        matches.append(PolicyMatch(
-            policy_id=r.get("policy_id", str(r.get("_id", ""))),
-            title=r.get("title", "Untitled"),
-            department=r.get("department_owner_id", "Unknown"),
-            similarity=sim,
-            keyword_compliance=keyword_check,
-            overall_pass=overall_pass,
-            explanation=generate_explanation(r.get("title", ""), sim, keyword_check),
-            full_text=policy_text[:500]
-        ))
-
-    return matches
-
-
-async def get_historical_count(clause_text: str, db) -> int:
-    """Count similar resolved gaps in past 12 months."""
-    twelve_months_ago = datetime.utcnow() - timedelta(days=365)
-    # Simple keyword-based similarity for history check
-    keywords = clause_text.lower().split()[:5]
-    keyword_pattern = "|".join(re.escape(k) for k in keywords if len(k) > 4)
-
-    try:
-        count = await db.gap_queue.count_documents({
-            "triage_status": "resolved",
-            "created_at": {"$gte": twelve_months_ago},
-            "clause_text": {"$regex": keyword_pattern, "$options": "i"}
-        })
-        return count
-    except Exception:
-        return 0
-
-
-async def detect_gaps_for_circular(circular_id: str, db) -> GapDetectionResponse:
-    """Main gap detection orchestrator."""
+async def detect_gaps_for_circular(circular_id: str, db: Any) -> GapDetectionResponse:
     start = time.time()
-
-    # Fetch circular
     circular = await db.circulars.find_one({"circular_id": circular_id})
     if not circular:
         raise ValueError(f"Circular '{circular_id}' not found")
-
-    status = circular.get("ingestion_status", "")
-    if status in ("partially_parsed", "failed"):
-        logger.warning(
-            "Skipping gap detection for %s: status=%s",
-            circular_id,
-            status,
-        )
+        
+    if circular.get("ingestion_status") in ("not_applicable", "no_action_required"):
         return GapDetectionResponse(
             circular_id=circular_id,
-            total_clauses_analyzed=0,
-            status="blocked",
-            reason=f"Cannot process {status} circular",
-            detection_time_ms=int((time.time() - start) * 1000),
-        )
-    if status not in ("fully_parsed", "processed"):
-        raise ValueError(
-            f"Circular '{circular_id}' has status '{status}'. Only fully_parsed and processed circulars are eligible."
+            status="completed",
+            reason=f"Ignored because ingestion status is {circular.get('ingestion_status')}"
         )
 
+    title = circular.get("title", "Regulatory Circular")
+    circular_num = circular.get("circular_number") or circular_id
     clauses = circular.get("clauses", [])
-    # Only analyze mandatory obligation clauses
-    target_clauses = [c for c in clauses if c.get("obligation_type") in ("shall", "must")]
-
+    
+    # Analyze directives
+    target_clauses = [c for c in clauses if c.get("obligation_type") in ("shall", "must", "should")]
     if not target_clauses:
-        target_clauses = clauses  # fallback: analyze all
+        target_clauses = clauses
 
-    results: list[GapCheckResult] = []
-    queue_entries: list[dict] = []
+    # Fetch active policies
+    today = datetime.utcnow()
+    policies = await db.policies.find({
+        "status": "active",
+        "$or": [
+            {"effective_until": None},
+            {"effective_until": {"$gte": today}}
+        ]
+    }).to_list(length=100)
+
+    rake = RakeKeywordExtractor()
+    results = []
+    queue_entries = []
     counters = {"covered": 0, "suspected": 0, "confirmed": 0, "data_error": 0}
 
     for clause in target_clauses:
         clause_text = clause.get("text", "")
         clause_num = clause.get("clause_number")
-        embedding = clause.get("embedding")
-        obligation = clause.get("obligation_type")
-        severity = clause.get("severity")
-
-        if not clause_text:
+        page_num = clause.get("page_number", 1)
+        
+        if not clause_text.strip():
             counters["data_error"] += 1
             results.append(GapCheckResult(
                 clause_number=clause_num,
@@ -333,94 +353,230 @@ async def detect_gaps_for_circular(circular_id: str, db) -> GapDetectionResponse
                 classification_reason="Empty clause text"
             ))
             continue
+            
+        # RAKE Keyword Extraction
+        clause_kws = set(rake.extract_keywords(clause_text))
+        
+        best_score = 0.0
+        best_policy = None
+        best_clause_text = None
+        best_clause_page = 1
+        matches_above_threshold = []
+        
+        for policy in policies:
+            policy_text = policy.get("content", "")
+            policy_id = policy["policy_id"]
+            policy_title = policy.get("title", "")
+            policy_clauses = policy.get("clauses", [])
+            
+            # If policy has structure-aware clauses
+            if policy_clauses:
+                for pc in policy_clauses:
+                    pc_text = pc.get("text_content", "")
+                    pc_kws = set(rake.extract_keywords(pc_text))
+                    
+                    # Score
+                    score = calculate_weighted_score(clause_text, pc_text, clause_kws, pc_kws)
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_policy = policy
+                        best_clause_text = pc_text
+                        best_clause_page = pc.get("page_number", 1)
+                        
+                    if score >= SIMILARITY_THRESHOLD_CLAUSE:
+                        matches_above_threshold.append({
+                            "policy_id": policy_id,
+                            "policy_title": policy_title,
+                            "clause_text": pc_text,
+                            "page_number": pc.get("page_number", 1),
+                            "score": score
+                        })
+            else:
+                # Fallback to whole policy check
+                pol_kws = set(rake.extract_keywords(policy_text))
+                score = calculate_weighted_score(clause_text, policy_text, clause_kws, pol_kws)
+                if score > best_score:
+                    best_score = score
+                    best_policy = policy
+                    best_clause_text = policy_text[:300]
+                    best_clause_page = 1
+                    
+                if score >= SIMILARITY_THRESHOLD_CLAUSE:
+                    matches_above_threshold.append({
+                        "policy_id": policy_id,
+                        "policy_title": policy_title,
+                        "clause_text": policy_text[:300],
+                        "page_number": 1,
+                        "score": score
+                    })
 
-        # ── Layer 0: Vector Search ─────────────────────────────────────
-        if embedding:
-            policy_matches = await vector_search_policies(embedding, db, clause_text)
-        else:
-            # No embedding — use mock matches
-            policy_matches = []
-
-        top_match = policy_matches[0] if policy_matches else None
-        sim = top_match.similarity if top_match else 0.0
-
-        # ── Layer 1: Semantic Similarity ───────────────────────────────
-        if sim >= SIMILARITY_COVERED:
-            # Proceed to keyword check
-            kw_check = top_match.keyword_compliance if top_match else {}
-            missing = [kw for v in kw_check.values() for kw in v.policy_missing]
-
-            if missing:
-                gap_status = "suspected"
-                reason = f"Semantic match ({sim:.2f} ≥ {SIMILARITY_COVERED}) but missing keywords: {missing}"
-                counters["suspected"] += 1
+        # Classify status & gaps
+        gap_type = "missing_clause"
+        gap_status = "confirmed"
+        
+        if best_score >= SIMILARITY_THRESHOLD_MATCH:
+            # Check directives match
+            directive_keyword_mismatch = False
+            lower_clause = clause_text.lower()
+            lower_policy = (best_clause_text or "").lower()
+            if ("shall" in lower_clause or "must" in lower_clause) and ("may" in lower_policy or "consider" in lower_policy):
+                directive_keyword_mismatch = True
+                
+            if directive_keyword_mismatch:
+                gap_status = "confirmed"
+                gap_type = "insufficient_clause"
+                reason = f"Partial match found but directive is weaker than RBI requirement (overall score {best_score:.2f})."
+                counters["confirmed"] += 1
             else:
                 gap_status = "covered"
-                reason = f"Semantic match ({sim:.2f} ≥ {SIMILARITY_COVERED}) + all keywords found"
+                reason = f"Complies with active policy: '{best_policy['title']}' (weighted score {best_score:.2f} >= {SIMILARITY_THRESHOLD_MATCH})"
                 counters["covered"] += 1
-        elif sim >= SIMILARITY_SUSPECTED:
-            kw_check = top_match.keyword_compliance if top_match else {}
-            gap_status = "suspected"
-            reason = f"Moderate semantic match ({sim:.2f}). In review zone [{SIMILARITY_SUSPECTED}-{SIMILARITY_COVERED}]"
-            counters["suspected"] += 1
-        else:
-            kw_check = {}
+        elif best_score >= SIMILARITY_THRESHOLD_PARTIAL:
             gap_status = "confirmed"
-            reason = f"Low semantic similarity ({sim:.2f} < {SIMILARITY_SUSPECTED}) — no matching policy"
+            gap_type = "insufficient_clause"
+            reason = f"Policy exists but is weaker or deviates from RBI guidelines (weighted score {best_score:.2f})."
             counters["confirmed"] += 1
-
-        # ── Layer 3: Historical Pattern ────────────────────────────────
-        hist_count = await get_historical_count(clause_text, db)
-        routing = "auto_routed" if (gap_status in ("confirmed", "suspected") and hist_count >= HISTORICAL_AUTO_ROUTE_THRESHOLD) else "pending_review"
-
-        # ── Build judge explanation steps ──────────────────────────────
-        judge_steps = build_judge_steps(clause_text, top_match, kw_check, hist_count, gap_status)
-
+        else:
+            gap_status = "confirmed"
+            gap_type = "missing_clause"
+            p_title = best_policy['title'] if best_policy else "None"
+            reason = f"No matching compliance clause found. Highest match: '{p_title}' (weighted score {best_score:.2f} < {SIMILARITY_THRESHOLD_PARTIAL})"
+            counters["confirmed"] += 1
+            
         result = GapCheckResult(
             clause_number=clause_num,
             clause_text=clause_text,
-            obligation_type=obligation,
-            severity=severity,
+            obligation_type=clause.get("obligation_type"),
+            severity=clause.get("severity"),
             gap_status=gap_status,
-            top_policy_matches=policy_matches,
-            similarity_score=round(sim, 4),
-            classification_reason=reason,
-            judge_explanation=judge_steps,
-            historical_match_count=hist_count,
-            routing=routing
+            similarity_score=round(best_score, 4),
+            classification_reason=reason
         )
         results.append(result)
 
-        # ── Create queue entry for non-covered gaps ────────────────────
-        if gap_status in ("suspected", "confirmed"):
-            gap_id = f"GAP-{str(uuid.uuid4())[:8].upper()}"
-            entry = {
-                "gap_id": gap_id,
-                "circular_id": circular_id,
-                "clause_number": clause_num,
-                "clause_text": clause_text,
-                "obligation_type": obligation,
-                "severity": severity,
-                "gap_status": gap_status,
-                "similarity_score": round(sim, 4),
-                "top_policy_id": top_match.policy_id if top_match else None,
-                "top_policy_title": top_match.title if top_match else None,
-                "classification_reason": reason,
-                "routing": routing,
-                "triage_status": "new",
-                "created_at": datetime.utcnow(),
-                "judge_explanation": [s.model_dump() for s in judge_steps],
-                "historical_match_count": hist_count
-            }
-            queue_entries.append(entry)
-
-        # ── Update clause gap_status in DB ─────────────────────────────
+        # Update circular clause status
         await db.circulars.update_one(
             {"circular_id": circular_id, "clauses.text": clause_text},
             {"$set": {"clauses.$.gap_status": gap_status}}
         )
 
-    # Persist queue entries
+        # Generate Gaps
+        if gap_status == "confirmed":
+            substance_hash = compute_substance_hash(clause_text)
+            
+            # Deduplication: check if already exists
+            existing_gap = await db.gap_queue.find_one({
+                "guideline_substance_hash": substance_hash,
+                "triage_status": {"$in": ["assigned", "open"]}
+            })
+            if existing_gap:
+                # Update existing gap page list
+                await db.gap_queue.update_one(
+                    {"gap_id": existing_gap["gap_id"]},
+                    {"$addToSet": {"page_numbers_list": page_num}}
+                )
+                continue
+                
+            # Classify severity and routing
+            severity, due_days = parse_severity_and_deadline(clause_text)
+            dept_id, is_ambiguous, ambiguous_depts = route_department(circular_num, clause_text)
+            
+            # Resolve HOD
+            dept_doc = await db.departments.find_one({"department_id": dept_id})
+            hod_id = dept_doc.get("head_employee_id", "EMP-COMPLIANCE-HEAD") if dept_doc else "EMP-COMPLIANCE-HEAD"
+            
+            # Auto-assign with availability checks
+            employee_id = await get_available_employee(db, dept_id)
+            
+            # Set due date
+            due_date = datetime.utcnow() + timedelta(days=due_days)
+            
+            gap_id = f"GAP-{str(uuid.uuid4())[:8].upper()}"
+            
+            # Generate template mismatch description
+            pol_title = best_policy["title"] if best_policy else "N/A"
+            c_text_preview = (best_clause_text[:100] + "...") if best_clause_text else "N/A"
+            mismatch_desc = (
+                f"RBI Circular {title}, Page {page_num} mandates: '{clause_text}'. "
+                f"Current Bank Policy '{pol_title}', Page {best_clause_page} states: '{c_text_preview}'. "
+                f"GAP: {gap_type.upper()}. Department: {dept_doc.get('name', 'Compliance') if dept_doc else 'Compliance'} must address this."
+            )
+            
+            # N:1 Mapping: Create separate entries if other clauses score above 0.60
+            parent_guideline_id = None
+            if len(matches_above_threshold) > 1:
+                parent_guideline_id = gap_id
+                
+            entry = {
+                "gap_id": gap_id,
+                "circular_id": circular_id,
+                "circular_title": title,
+                "clause_number": clause_num,
+                "clause_text": clause_text,
+                "obligation_type": clause.get("obligation_type"),
+                "severity": severity,
+                "gap_status": gap_status,
+                "similarity_score": round(best_score, 4),
+                "top_policy_id": best_policy["policy_id"] if best_policy else "POL-COMP-001",
+                "top_policy_title": best_policy["title"] if best_policy else "Compliance Policy",
+                "classification_reason": reason,
+                "routing": "auto_routed",
+                "triage_status": "assigned" if employee_id else "open",
+                "created_at": datetime.utcnow(),
+                "page_number": page_num,
+                "page_numbers_list": [page_num],
+                "department_id": dept_id,
+                "assigned_hod": hod_id,
+                "assigned_employee": employee_id,
+                "due_date": due_date,
+                "fixed_policy_content": None,
+                "remaining_gaps": [],
+                "is_fixed": False,
+                # Hardening additions
+                "guideline_substance_hash": substance_hash,
+                "parent_guideline_id": parent_guideline_id,
+                "source": "circular_upload",
+                "is_ambiguous": is_ambiguous,
+                "ambiguous_departments": ambiguous_depts,
+                "mismatch_description": mismatch_desc
+            }
+            queue_entries.append(entry)
+            
+            # Update employee counters if assigned
+            if employee_id:
+                await db.users.update_one(
+                    {"emp_id": employee_id},
+                    {
+                        "$inc": {"active_gap_count": 1},
+                        "$set": {"last_assigned_date": datetime.utcnow()}
+                    }
+                )
+                
+                # Notify Employee
+                await db.notifications.insert_one({
+                    "notification_id": f"NOTIF-{str(uuid.uuid4())[:8].upper()}",
+                    "user_id": employee_id,
+                    "title": "New Gap Assigned",
+                    "message": f"Gap {gap_id} (Page {page_num}) has been assigned to you. Due by {due_date.strftime('%Y-%m-%d')}.",
+                    "type": "gap_assigned",
+                    "gap_id": gap_id,
+                    "is_read": False,
+                    "created_at": datetime.utcnow()
+                })
+                
+            # Notify HOD
+            await db.notifications.insert_one({
+                "notification_id": f"NOTIF-{str(uuid.uuid4())[:8].upper()}",
+                "user_id": hod_id,
+                "title": "New Departmental Gap",
+                "message": f"Gap {gap_id} has been auto-routed to your department. " + (f"Assigned to employee {employee_id}." if employee_id else "No employees available - manual assignment required."),
+                "type": "gap_assigned",
+                "gap_id": gap_id,
+                "is_read": False,
+                "created_at": datetime.utcnow()
+            })
+
     if queue_entries:
         await db.gap_queue.insert_many(queue_entries)
 
@@ -432,11 +588,256 @@ async def detect_gaps_for_circular(circular_id: str, db) -> GapDetectionResponse
         circular_id=circular_id,
         total_clauses_analyzed=total,
         covered=covered,
-        suspected=counters["suspected"],
+        suspected=0,
         confirmed=counters["confirmed"],
         data_errors=counters["data_error"],
         coverage_rate=round(covered / total, 4) if total > 0 else 0.0,
         gaps=results,
         detection_time_ms=duration_ms,
-        status="completed",
+        status="completed"
     )
+
+# ─────────────────────────────────────────────────────────────
+#  Regression & Recheck Verification Pipeline
+# ─────────────────────────────────────────────────────────────
+
+async def recheck_policy_gap(gap_id: str, updated_content: str, db: Any) -> Dict[str, Any]:
+    gap = await db.gap_queue.find_one({"gap_id": gap_id})
+    if not gap:
+        return {"resolved": False, "remaining_gaps": ["Gap not found."]}
+
+    clause_text = gap.get("clause_text", "")
+    rake = RakeKeywordExtractor()
+    
+    clause_kws = set(rake.extract_keywords(clause_text))
+    
+    # Segment updated_content into sentences/paragraphs/clauses for granular checking
+    updated_sentences = []
+    try:
+        from services.watcher import parse_clauses
+        parsed_c = parse_clauses(updated_content)
+        updated_sentences.extend([c.text for c in parsed_c if c.text.strip()])
+    except Exception:
+        pass
+        
+    for part in re.split(r'\.\s+|\n+', updated_content):
+        if part.strip():
+            updated_sentences.append(part.strip())
+            
+    updated_sentences.append(updated_content.strip())
+    
+    best_score = 0.0
+    for sentence in set(updated_sentences):
+        sent_kws = set(rake.extract_keywords(sentence))
+        s_score = calculate_weighted_score(clause_text, sentence, clause_kws, sent_kws)
+        if s_score > best_score:
+            best_score = s_score
+            
+    score = best_score
+    original_resolved = score >= SIMILARITY_THRESHOLD_MATCH
+
+    
+    # 2. Check for REGRESSIONS: run full gap detection for ALL active circulars against the updated content
+    today = datetime.utcnow()
+    active_circulars = await db.circulars.find({"ingestion_status": {"$in": ["fully_parsed", "partially_parsed"]}}).to_list(length=100)
+    
+    introduced_gaps = []
+    
+    for circ in active_circulars:
+        # Skip evaluating the original circular guideline being resolved
+        circ_clauses = circ.get("clauses", [])
+        for cc in circ_clauses:
+            if cc.get("obligation_type") not in ("shall", "must", "should"):
+                continue
+            cc_text = cc.get("text", "")
+            if cc_text == clause_text:
+                continue
+                
+            cc_kws = set(rake.extract_keywords(cc_text))
+            
+            best_cc_score = 0.0
+            for sentence in set(updated_sentences):
+                sent_kws = set(rake.extract_keywords(sentence))
+                s_score = calculate_weighted_score(cc_text, sentence, cc_kws, sent_kws)
+                if s_score > best_cc_score:
+                    best_cc_score = s_score
+            
+            cc_score = best_cc_score
+            
+            # If similarity is below threshold, it's a regression violation
+            if cc_score < SIMILARITY_THRESHOLD_PARTIAL:
+                introduced_gaps.append({
+                    "circular_id": circ["circular_id"],
+                    "circular_title": circ.get("title", ""),
+                    "clause_text": cc_text,
+                    "score": cc_score
+                })
+
+    employee_id = gap.get("assigned_employee")
+    employee_doc = await db.users.find_one({"emp_id": employee_id})
+    employee_name = employee_doc.get("name", "Employee") if employee_doc else "Employee"
+
+    if original_resolved and not introduced_gaps:
+        # ── SUCCESS ──
+        await db.gap_queue.update_one(
+            {"gap_id": gap_id},
+            {
+                "$set": {
+                    "triage_status": "resolved",
+                    "fixed_policy_content": updated_content,
+                    "is_fixed": True,
+                    "remaining_gaps": [],
+                    "similarity_score": round(score, 4),
+                    "classification_reason": f"Resolved: Guideline matches updated policy content (score {score:.2f} >= {SIMILARITY_THRESHOLD_MATCH})"
+                }
+            }
+        )
+        
+        # Decrement workload counter
+        if employee_id:
+            await db.users.update_one(
+                {"emp_id": employee_id},
+                {"$inc": {"active_gap_count": -1}}
+            )
+
+        # Notify HOD
+        await db.notifications.insert_one({
+            "notification_id": f"NOTIF-{str(uuid.uuid4())[:8].upper()}",
+            "user_id": gap.get("assigned_hod"),
+            "title": "Gap Resolved",
+            "message": f"Gap {gap_id} has been resolved by {employee_name} in Policy '{gap.get('top_policy_title')}'. Pending review.",
+            "type": "gap_resolved",
+            "gap_id": gap_id,
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        })
+
+        # Notify Admin
+        await db.notifications.insert_one({
+            "notification_id": f"NOTIF-{str(uuid.uuid4())[:8].upper()}",
+            "user_id": "EMP-ADMIN-001",
+            "title": "Core Policy Update Awaiting HOD Approval",
+            "message": f"Gap {gap_id} has been resolved by {employee_name}. Approve to apply to core bank policies.",
+            "type": "gap_resolved",
+            "gap_id": gap_id,
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        })
+
+        return {"resolved": True, "status": "resolved", "remaining_gaps": []}
+        
+    elif original_resolved and introduced_gaps:
+        # ── REGRESSION DETECTED ──
+        # Fix original gap
+        await db.gap_queue.update_one(
+            {"gap_id": gap_id},
+            {
+                "$set": {
+                    "triage_status": "resolved",
+                    "fixed_policy_content": updated_content,
+                    "is_fixed": True,
+                    "remaining_gaps": [f"Regression: introduces gaps on other circulars"]
+                }
+            }
+        )
+        
+        if employee_id:
+            await db.users.update_one(
+                {"emp_id": employee_id},
+                {"$inc": {"active_gap_count": -1}}
+            )
+
+        # Generate regression gaps
+        new_gaps = []
+        for reg in introduced_gaps:
+            reg_gap_id = f"GAP-{str(uuid.uuid4())[:8].upper()}"
+            reg_substance_hash = compute_substance_hash(reg["clause_text"])
+            reg_entry = {
+                "gap_id": reg_gap_id,
+                "circular_id": reg["circular_id"],
+                "circular_title": reg["circular_title"],
+                "clause_text": reg["clause_text"],
+                "severity": "high",
+                "gap_status": "confirmed",
+                "similarity_score": round(reg["score"], 4),
+                "top_policy_id": gap.get("top_policy_id"),
+                "top_policy_title": gap.get("top_policy_title"),
+                "classification_reason": f"Regression: introduced by fixing {gap_id}",
+                "routing": "auto_routed",
+                "triage_status": "assigned" if employee_id else "open",
+                "created_at": datetime.utcnow(),
+                "page_number": 1,
+                "page_numbers_list": [1],
+                "department_id": gap.get("department_id"),
+                "assigned_hod": gap.get("assigned_hod"),
+                "assigned_employee": employee_id,
+                "due_date": datetime.utcnow() + timedelta(days=7),
+                "fixed_policy_content": None,
+                "remaining_gaps": [],
+                "is_fixed": False,
+                "guideline_substance_hash": reg_substance_hash,
+                "parent_guideline_id": gap_id,
+                "source": "fix_regression",
+                "is_ambiguous": False,
+                "ambiguous_departments": [],
+                "mismatch_description": f"REGRESSION: Fixing Gap {gap_id} broke guideline compliance for circular {reg['circular_title']}."
+            }
+            new_gaps.append(reg_entry)
+            
+            if employee_id:
+                await db.users.update_one(
+                    {"emp_id": employee_id},
+                    {"$inc": {"active_gap_count": 1}}
+                )
+                
+        if new_gaps:
+            await db.gap_queue.insert_many(new_gaps)
+            
+        # Notify HOD
+        await db.notifications.insert_one({
+            "notification_id": f"NOTIF-{str(uuid.uuid4())[:8].upper()}",
+            "user_id": gap.get("assigned_hod"),
+            "title": "Regressions Detected in Policy Fix",
+            "message": f"Gap {gap_id} fix resolved the issue but introduced {len(new_gaps)} new regressions. Created regression tasks.",
+            "type": "fix_rejected",
+            "gap_id": gap_id,
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        })
+
+        return {"resolved": True, "status": "resolved_with_regression", "new_gaps": new_gaps, "remaining_gaps": []}
+        
+    else:
+        # ── FAILED TO RESOLVE ──
+        mismatch_msg = f"The updated policy still does not comply with the circular guideline (score: {score:.2f} < {SIMILARITY_THRESHOLD_MATCH})."
+        await db.gap_queue.update_one(
+            {"gap_id": gap_id},
+            {
+                "$set": {
+                    "fixed_policy_content": updated_content,
+                    "is_fixed": False,
+                    "remaining_gaps": [mismatch_msg]
+                }
+            }
+        )
+        
+        # Extend deadline by 3 days
+        extended_due = (gap.get("due_date") or datetime.utcnow()) + timedelta(days=3)
+        await db.gap_queue.update_one(
+            {"gap_id": gap_id},
+            {"$set": {"due_date": extended_due}}
+        )
+
+        # Notify Employee
+        await db.notifications.insert_one({
+            "notification_id": f"NOTIF-{str(uuid.uuid4())[:8].upper()}",
+            "user_id": employee_id,
+            "title": "Fix Rejected - Gap Still Active",
+            "message": f"Submitting fixes for Gap {gap_id} failed. Some mismatches are still present. New deadline: {extended_due.strftime('%Y-%m-%d')}.",
+            "type": "fix_rejected",
+            "gap_id": gap_id,
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        })
+
+        return {"resolved": False, "status": "failed", "remaining_gaps": [mismatch_msg]}

@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-const DEPT_ROLES = ['employee', 'department_head'];
+const DEPT_ROLES = ['employee', 'department_head', 'dept_head'];
 
 /** Redirect to login if not authenticated */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {

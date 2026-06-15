@@ -23,14 +23,6 @@ export const CircularDetailPage = () => {
   const [circular, setCircular] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!circularId) {
-      navigate('/admin/circulars', { replace: true });
-      return;
-    }
-    fetchCircular();
-  }, [circularId]);
-
   const fetchCircular = async () => {
     setLoading(true);
     try {
@@ -43,6 +35,15 @@ export const CircularDetailPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!circularId) {
+      navigate('/admin/circulars', { replace: true });
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCircular();
+  }, [circularId]);
 
   const handleDownload = () => {
     window.open(circularsApi.downloadUrl(circularId), '_blank');
