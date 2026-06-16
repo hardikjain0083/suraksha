@@ -383,6 +383,7 @@ async def detect_gaps_for_circular(circular_id: str, db: Any) -> GapDetectionRes
                         best_policy = policy
                         best_clause_text = pc_text
                         best_clause_page = pc.get("page_number", 1)
+                        best_line_num = None # Can't determine line number exactly for pre-segmented clauses
                         
                     if score >= SIMILARITY_THRESHOLD_CLAUSE:
                         matches_above_threshold.append({
@@ -396,11 +397,26 @@ async def detect_gaps_for_circular(circular_id: str, db: Any) -> GapDetectionRes
                 # Fallback to whole policy check
                 pol_kws = set(rake.extract_keywords(policy_text))
                 score = calculate_weighted_score(clause_text, policy_text, clause_kws, pol_kws)
+                # Also find best line for display
+                lines = policy_text.split('\n')
+                best_line_score = 0
+                best_line_num_local = 1
+                best_line_text_local = policy_text[:300]
+                for idx, line in enumerate(lines):
+                    if len(line.strip()) < 10: continue
+                    line_kws = set(rake.extract_keywords(line))
+                    ls = calculate_weighted_score(clause_text, line, clause_kws, line_kws)
+                    if ls > best_line_score:
+                        best_line_score = ls
+                        best_line_num_local = idx + 1
+                        best_line_text_local = line
+
                 if score > best_score:
                     best_score = score
                     best_policy = policy
-                    best_clause_text = policy_text[:300]
+                    best_clause_text = best_line_text_local
                     best_clause_page = 1
+                    best_line_num = best_line_num_local
                     
                 if score >= SIMILARITY_THRESHOLD_CLAUSE:
                     matches_above_threshold.append({
@@ -525,6 +541,7 @@ async def detect_gaps_for_circular(circular_id: str, db: Any) -> GapDetectionRes
                 "triage_status": "assigned" if employee_id else "open",
                 "created_at": datetime.utcnow(),
                 "page_number": page_num,
+                "matched_policy_line_num": best_line_num if 'best_line_num' in locals() else None,
                 "page_numbers_list": [page_num],
                 "department_id": dept_id,
                 "assigned_hod": hod_id,

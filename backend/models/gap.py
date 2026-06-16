@@ -73,6 +73,7 @@ class GapQueueEntry(BaseModel):
     judge_explanation: List[JudgeExplanationStep] = []
     historical_match_count: int = 0
     page_number: Optional[int] = 1
+    matched_policy_line_num: Optional[int] = None
     department_id: Optional[str] = None
     assigned_hod: Optional[str] = None
     assigned_employee: Optional[str] = None

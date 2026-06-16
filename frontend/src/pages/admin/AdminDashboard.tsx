@@ -814,7 +814,7 @@ export function AdminDashboard() {
                       <th className="pb-3">Gap ID</th>
                       <th className="pb-3">Circular Guideline</th>
                       <th className="pb-3 text-center">Page</th>
-                      <th className="pb-3">Policy Match</th>
+                      <th className="pb-3">Policy & Line</th>
                       <th className="pb-3">Department</th>
                       <th className="pb-3">Assignee</th>
                       <th className="pb-3">Status</th>
@@ -849,7 +849,12 @@ export function AdminDashboard() {
                           <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5" title={gap.clause_text}>{gap.clause_text}</p>
                         </td>
                         <td className="py-4 text-center font-bold text-cyber-cyan">{gap.page_number}</td>
-                        <td className="py-4 text-slate-300 font-medium">{gap.top_policy_title || 'N/A'}</td>
+                        <td className="py-4 text-slate-300 font-medium">
+                          {gap.top_policy_title || 'N/A'}
+                          {gap.matched_policy_line_num && (
+                            <div className="text-[10px] text-cyber-cyan mt-1">Line: {gap.matched_policy_line_num}</div>
+                          )}
+                        </td>
                         <td className="py-4 text-cyber-blue font-bold">
                           {gap.department_id?.replace("DEPT-", "")}
                           {gap.is_ambiguous && (
