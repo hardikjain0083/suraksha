@@ -6,6 +6,7 @@ import io
 import sys
 sys.path.insert(0, ".")
 from services.watcher import process_circular, extract_pdf_robust, get_embedder, generate_embeddings
+from services.audit_logger import append_audit_log
 
 router = APIRouter()
 
@@ -97,6 +98,16 @@ async def upload_policy(
     
     await database.policies.insert_one(doc)
     
+    await append_audit_log(
+        database,
+        action_type="POLICY_UPLOADED",
+        target_type="policy",
+        target_id=policy_id,
+        user_id="admin",
+        user_name="Administrator",
+        details={"title": title, "department": department, "version": version}
+    )
+    
     return {"status": "success", "policy_id": policy_id}
 
 
@@ -106,6 +117,16 @@ async def archive_policy(policy_id: str):
     res = await database.policies.update_one({'policy_id': policy_id}, {'$set': {'status': 'archived', 'valid_until': datetime.utcnow()}})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail='Policy not found')
+        
+    await append_audit_log(
+        database,
+        action_type="POLICY_ARCHIVED",
+        target_type="policy",
+        target_id=policy_id,
+        user_id="admin",
+        user_name="Administrator"
+    )
+    
     return {'status': 'success', 'message': 'Policy archived'}
 
 @router.patch('/{policy_id}/unarchive')
@@ -117,6 +138,16 @@ async def unarchive_policy(policy_id: str):
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail='Policy not found')
+        
+    await append_audit_log(
+        database,
+        action_type="POLICY_UNARCHIVED",
+        target_type="policy",
+        target_id=policy_id,
+        user_id="admin",
+        user_name="Administrator"
+    )
+    
     return {'status': 'success', 'message': 'Policy unarchived'}
 
 @router.delete('/{policy_id}')
@@ -125,6 +156,16 @@ async def delete_policy(policy_id: str):
     res = await database.policies.delete_one({'policy_id': policy_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail='Policy not found')
+        
+    await append_audit_log(
+        database,
+        action_type="POLICY_DELETED",
+        target_type="policy",
+        target_id=policy_id,
+        user_id="admin",
+        user_name="Administrator"
+    )
+    
     return {'status': 'success', 'message': 'Policy deleted'}
 
 @router.patch('/{policy_id}')
@@ -140,4 +181,15 @@ async def update_policy(policy_id: str, title: str = Form(None), version: str = 
     res = await database.policies.update_one({'policy_id': policy_id}, {'$set': update_data})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail='Policy not found')
+        
+    await append_audit_log(
+        database,
+        action_type="POLICY_UPDATED",
+        target_type="policy",
+        target_id=policy_id,
+        user_id="admin",
+        user_name="Administrator",
+        details=update_data
+    )
+    
     return {'status': 'success', 'message': 'Policy updated'}

@@ -80,3 +80,34 @@ CIRCULAR_PREFIX_MAP = {
     "FEMA": {"dept_hint": ["Treasury", "Operations"], "category": "Foreign Exchange"},
 }
 
+FINANCIAL_STOPWORDS = {
+    "bank", "circular", "rbi", "reserve", "of", "india",
+    "section", "subsection", "annexure", "schedule", "hereinafter",
+    "thereof", "pursuant", "notwithstanding", "aforesaid", "herein",
+    "whereas", "whereby", "aforementioned", "therein",
+    "above", "below", "hereby", "thereby", "furthermore", "moreover"
+}
+
+DIRECTIVE_KEYWORDS = {
+    "shall", "must", "should", "are required to", "banks are directed to",
+    "it is mandatory", "with immediate effect", "compliance required by",
+    "shall ensure", "shall maintain", "shall submit", "shall furnish",
+    "shall comply", "shall adhere", "shall implement", "shall establish",
+    "shall review", "shall formulate", "shall put in place",
+    "are advised to", "are encouraged to", "may consider",
+    "shall develop", "shall monitor", "shall report", "shall conduct",
+    "shall appoint", "shall participate", "shall ensure"
+}
+
+MATCH_THRESHOLD = 0.75
+PARTIAL_THRESHOLD = 0.30
+
+SIGNAL_WEIGHTS = {
+    "tfidf": 0.30,
+    "jaccard": 0.20,
+    "fuzzy": 0.15,
+    "embedding": 0.00,
+    "frame": 0.35
+}
+
+DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"

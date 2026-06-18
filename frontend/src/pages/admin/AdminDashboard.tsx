@@ -25,10 +25,11 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { GlassCard } from '@/components/ui/glass-card';
+import { GapDetailModal } from '../../components/gaps/GapDetailModal';
 
 export function AdminDashboard() {
-  // Tabs: 'gaps' | 'upload' | 'approvals' | 'policies' | 'orphans'
-  const [activeTab, setActiveTab] = useState<'gaps' | 'upload' | 'approvals' | 'policies' | 'orphans'>('gaps');
+  // Tabs: 'gaps' | 'upload' | 'approvals' | 'policies' | 'orphans' | 'audit'
+  const [activeTab, setActiveTab] = useState<'gaps' | 'upload' | 'approvals' | 'policies' | 'orphans' | 'audit'>('gaps');
   
   // Data states
   const [gaps, setGaps] = useState<any[]>([]);
@@ -37,11 +38,18 @@ export function AdminDashboard() {
   const [employeesByDept, setEmployeesByDept] = useState<Record<string, any[]>>({});
   const [orphanedDirectives, setOrphanedDirectives] = useState<any[]>([]);
   
+  // Audit states
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [chainVerification, setChainVerification] = useState<any>(null);
+  const [verifyingChain, setVerifyingChain] = useState(false);
+  
   // Filtering states
   const [filterDept, setFilterDept] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [groupByDay, setGroupByDay] = useState(false);
+  const [selectedGap, setSelectedGap] = useState<any>(null);
   
   // Selection states (for Bulk Actions)
   const [selectedGapIds, setSelectedGapIds] = useState<string[]>([]);
@@ -120,6 +128,36 @@ export function AdminDashboard() {
     }
   };
 
+  const fetchAuditLogs = async () => {
+    setLoadingAudit(true);
+    try {
+      const res = await apiClient.get('/api/admin/audit/');
+      setAuditLogs(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  const verifyChain = async () => {
+    setVerifyingChain(true);
+    try {
+      const res = await apiClient.get('/api/admin/audit/verify');
+      setChainVerification(res.data);
+      if (res.data.verified) {
+        triggerToast('Cryptographic chain verified successfully. No tampering detected.');
+      } else {
+        triggerToast(`Chain validation failed! Tampering detected at block: ${res.data.broken_at}`, true);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Verification check failed to execute.', true);
+    } finally {
+      setVerifyingChain(false);
+    }
+  };
+
   // Seed list of employees per department for reassign dropdown
   const seedEmployeeList = async () => {
     try {
@@ -148,6 +186,7 @@ export function AdminDashboard() {
     fetchNotifications();
     seedEmployeeList();
     fetchOrphans();
+    fetchAuditLogs();
   }, []);
 
   const triggerToast = (msg: string, isError = false) => {
@@ -523,14 +562,15 @@ export function AdminDashboard() {
 
       {/* Navigation Tabs */}
       <div className="flex border-b border-cyber-cyan/10">
-        {(['gaps', 'upload', 'approvals', 'policies', 'orphans'] as const).map(tab => {
+        {(['gaps', 'upload', 'approvals', 'policies', 'orphans', 'audit'] as const).map(tab => {
           const active = activeTab === tab;
           const labels = {
             gaps: 'Remediation Queue',
             upload: 'Ingest Center',
             approvals: `Pending Updates (${resolvedGapsPendingApproval})`,
             policies: 'Core Policy Repository',
-            orphans: `Orphaned Directives (${orphanedDirectives.length})`
+            orphans: `Orphaned Directives (${orphanedDirectives.length})`,
+            audit: 'Audit Ledger'
           };
           return (
             <button
@@ -823,8 +863,8 @@ export function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-cyber-cyan/5">
                     {filteredGaps.map(gap => (
-                      <tr key={gap.gap_id} className="hover:bg-white/5 transition-colors">
-                        <td className="py-4 pl-2">
+                      <tr key={gap.gap_id} className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setSelectedGap(gap)}>
+                        <td className="py-4 pl-2" onClick={(e) => e.stopPropagation()}>
                           <input 
                             type="checkbox" 
                             checked={selectedGapIds.includes(gap.gap_id)}
@@ -882,13 +922,13 @@ export function AdminDashboard() {
                             {(gap.triage_status === 'assigned' || gap.triage_status === 'open') && (
                               <>
                                 <button 
-                                  onClick={() => setReassigningGapId(gap.gap_id)}
+                                  onClick={(e) => { e.stopPropagation(); setReassigningGapId(gap.gap_id); }}
                                   className="px-2 py-1 bg-cyber-blue/10 hover:bg-cyber-blue text-cyber-blue hover:text-white border border-cyber-blue/30 rounded text-[10px] font-bold transition-all"
                                 >
                                   Assign
                                 </button>
                                 <button 
-                                  onClick={() => handleCancelGap(gap.gap_id)}
+                                  onClick={(e) => { e.stopPropagation(); handleCancelGap(gap.gap_id); }}
                                   disabled={actionLoading === gap.gap_id}
                                   className="px-2 py-1 bg-red-950/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/25 rounded text-[10px] font-bold transition-all"
                                 >
@@ -910,7 +950,7 @@ export function AdminDashboard() {
                                 ))}
                               </select>
                               <button 
-                                onClick={() => handleReassign(gap.gap_id)}
+                                onClick={(e) => { e.stopPropagation(); handleReassign(gap.gap_id); }}
                                 className="p-1 bg-cyber-cyan text-obsidian-950 rounded hover:scale-105 transition-transform"
                               >
                                 <Check className="w-3.5 h-3.5" />
@@ -1193,6 +1233,92 @@ export function AdminDashboard() {
             </div>
           )}
         </GlassCard>
+      )}
+
+      {/* AUDIT LEDGER */}
+      {activeTab === 'audit' && (
+        <GlassCard className="p-6 border-cyber-cyan/10 font-mono text-xs">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-sm font-bold text-cyber-cyan uppercase">Cryptographic Audit Ledger</h2>
+            <button
+              onClick={verifyChain}
+              disabled={verifyingChain}
+              className="px-4 py-2 bg-cyber-blue/10 hover:bg-cyber-blue text-cyber-blue hover:text-white border border-cyber-blue/30 rounded text-xs font-bold transition-all flex items-center gap-2"
+            >
+              {verifyingChain ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+              Verify Chain Integrity
+            </button>
+          </div>
+
+          {chainVerification && (
+            <div className={`p-4 mb-6 rounded border ${chainVerification.verified ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-400' : 'bg-red-950/20 border-red-500/30 text-red-400'}`}>
+              <h3 className="font-bold mb-1">Status: {chainVerification.integrity.toUpperCase()}</h3>
+              <p>Total Blocks Evaluated: {chainVerification.total_logs}</p>
+              {!chainVerification.verified && (
+                <p className="mt-2 font-bold bg-red-950 p-2 rounded">TAMPERING DETECTED AT LOG ID: {chainVerification.broken_at}</p>
+              )}
+            </div>
+          )}
+
+          {loadingAudit ? (
+            <div className="text-center py-16 text-slate-500 flex justify-center items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-cyber-cyan" />
+              Loading cryptographic ledger...
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <div className="text-center py-16 text-slate-500">No logs generated yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-cyber-cyan/20 text-slate-400 text-[10px] uppercase">
+                    <th className="pb-3 pl-2">Timestamp</th>
+                    <th className="pb-3">Action</th>
+                    <th className="pb-3">User</th>
+                    <th className="pb-3">Target</th>
+                    <th className="pb-3">Log ID & Integrity Hash</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-cyber-cyan/5">
+                  {auditLogs.map(log => (
+                    <tr key={log.log_id} className="hover:bg-white/5 transition-colors">
+                      <td className="py-4 pl-2 text-slate-400 whitespace-nowrap">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </td>
+                      <td className="py-4">
+                        <span className="px-2 py-0.5 bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/20 rounded font-bold uppercase text-[9px]">
+                          {log.action_type}
+                        </span>
+                      </td>
+                      <td className="py-4 text-slate-300">
+                        {log.user_name} <br/>
+                        <span className="text-[9px] text-slate-500">{log.user_id}</span>
+                      </td>
+                      <td className="py-4 text-slate-300">
+                        {log.target_type} <br/>
+                        <span className="text-[9px] text-slate-500">{log.target_id}</span>
+                      </td>
+                      <td className="py-4 font-mono">
+                        <div className="text-cyber-cyan text-[10px] font-bold">{log.log_id}</div>
+                        <div className="text-slate-500 text-[8px] truncate max-w-[200px]" title={log.tamper_evident_hash}>
+                          {log.tamper_evident_hash}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </GlassCard>
+      )}
+      {/* Gap Detail Modal */}
+      {selectedGap && (
+        <GapDetailModal
+          gap={selectedGap}
+          onClose={() => setSelectedGap(null)}
+          onActionComplete={fetchGaps}
+        />
       )}
     </div>
   );

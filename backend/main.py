@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from config import settings
 from database import connect_to_mongo, close_mongo_connection, db
-from api import auth, circulars, gaps, policies
+from api import auth, circulars, gaps, policies, audit
 
 
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +45,7 @@ app.include_router(circulars.router,  prefix="/api/circulars", tags=["Watcher Ci
 app.include_router(gaps.router,       prefix="/api/gaps",      tags=["Gap Detection"])
 app.include_router(policies.router,   prefix="/api/admin/policies", tags=["Policies"])
 app.include_router(auth.admin_router, prefix="/api",           tags=["Admin Users"])
+app.include_router(audit.router,      prefix="/api/admin/audit", tags=["Audit Logs"])
 
 
 

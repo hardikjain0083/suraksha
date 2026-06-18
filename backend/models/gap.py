@@ -40,6 +40,13 @@ class GapCheckResult(BaseModel):
     judge_explanation: List[JudgeExplanationStep] = []
     historical_match_count: int = 0
     routing: str = "pending_review"  # auto_routed | pending_review
+    
+    similarity_scores: Dict[str, float] = {}
+    rbi_action: Optional[str] = None
+    rbi_modality: Optional[str] = None
+    policy_action: Optional[str] = None
+    policy_modality: Optional[str] = None
+    mismatch_description: Optional[str] = None
 
 class GapDetectionResponse(BaseModel):
     circular_id: str
@@ -89,4 +96,10 @@ class GapQueueEntry(BaseModel):
     source: str = "circular_upload"  # circular_upload, fix_regression, manual
     is_ambiguous: bool = False
     ambiguous_departments: List[str] = []
-
+    
+    similarity_scores: Dict[str, float] = {}
+    rbi_action: Optional[str] = None
+    rbi_modality: Optional[str] = None
+    policy_action: Optional[str] = None
+    policy_modality: Optional[str] = None
+    mismatch_description: Optional[str] = None
