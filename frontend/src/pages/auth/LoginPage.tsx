@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, User, AlertCircle } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
+import { Lock, User, AlertCircle, Loader2 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBehavioralCapture } from '../../hooks/useBehavioralCapture';
 import { BehavioralCaptureIndicator } from '../../components/auth/BehavioralCaptureIndicator';
 import { SessionHealthBadge } from '../../components/auth/SessionHealthBadge';
+import bgImage from '../../assets/background.jpg';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -21,6 +21,7 @@ export const LoginPage = () => {
   const [isCapturing, setIsCapturing] = useState(false);
   const [sessionHealth, setSessionHealth] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
 
   const { keystrokeData, mouseData, captureKeystrokeDown, captureKeystrokeUp, captureMouse, reset } =
     useBehavioralCapture();
@@ -43,6 +44,7 @@ export const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setLoginSuccess(false);
     setError('');
 
     try {
@@ -86,7 +88,8 @@ export const LoginPage = () => {
       else if (role === 'auditor') defaultRedirect = '/audit';
 
       const redirect = new URLSearchParams(location.search).get('redirect') || defaultRedirect;
-      setTimeout(() => navigate(redirect), 1000);
+      setLoginSuccess(true);
+      setTimeout(() => navigate(redirect), 800);
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ??
@@ -95,43 +98,33 @@ export const LoginPage = () => {
       setError(msg);
       triggerShake();
       reset();
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="lp-root">
-      {/* Atmospheric neon glow overlay */}
-      <div className="lp-glow-overlay" />
+    <div className="lp-root" style={{ backgroundImage: `url(${bgImage})` }}>
+      <div className="lp-overlay" />
 
-      {/* ── Left Hero Column ──────────────────────────────────── */}
-      <div className="lp-hero-col">
-        <motion.div
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-          className="lp-hero-content"
-        >
-          <h1 className="lp-hero-heading">
-            ESTABLISH<br />SESSION
+      <div className="lp-content">
+        {/* Branding */}
+        <div className="lp-branding">
+          <h1 className="lp-brand-title">
+            <span role="img" aria-label="shield">🛡️</span> <span className="lp-brand-su">Su</span><span className="lp-brand-raksha">Raksha</span>
           </h1>
-          <p className="lp-hero-tagline">// SuRaksha Identity Verification Protocol v4.0</p>
-        </motion.div>
-      </div>
+          <p className="lp-brand-tagline">Your Safety, Our Priority</p>
+        </div>
 
-      {/* ── Right Auth Card Column ────────────────────────────── */}
-      <div className="lp-card-col">
+        {/* Login Card */}
         <motion.div
           animate={shake ? { x: [-8, 8, -8, 8, 0] } : {}}
           transition={{ duration: 0.4 }}
           className="lp-card"
         >
-          {/* Card Header */}
           <div className="lp-card-header">
             <div>
-              <h2 className="lp-card-title">ESTABLISH SESSION</h2>
-              <p className="lp-card-subtitle">SURAKSHA IDENTITY PORT V4.0</p>
+              <h2 className="lp-card-title">Welcome Back</h2>
+              <p className="lp-card-subtitle">Sign in to access your safety dashboard</p>
             </div>
             <AnimatePresence>
               {sessionHealth && (
@@ -146,9 +139,7 @@ export const LoginPage = () => {
             </AnimatePresence>
           </div>
 
-          {/* Auth Form */}
           <form onSubmit={handleSubmit} className="lp-form">
-            {/* Error message */}
             <AnimatePresence>
               {error && (
                 <motion.div
@@ -158,16 +149,15 @@ export const LoginPage = () => {
                   className="lp-error"
                 >
                   <AlertCircle className="lp-error-icon" />
-                  {error.toUpperCase()}
+                  {error}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Employee ID */}
             <div className="lp-field">
               <label className="lp-label">
                 <User className="lp-label-icon" />
-                OPERATOR ID
+                Operator ID
               </label>
               <input
                 type="text"
@@ -177,203 +167,183 @@ export const LoginPage = () => {
                 onKeyUp={handleKeyUp}
                 onMouseMove={captureMouse}
                 className="lp-input"
-                placeholder="EMP-COMP-001"
+                placeholder="Enter Operator ID"
                 required
                 autoComplete="username"
               />
             </div>
 
-            {/* Password */}
             <div className="lp-field">
               <label className="lp-label">
                 <Lock className="lp-label-icon" />
-                SECURE KEYPHRASE
+                Secure Keyphrase
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onKeyUp={handleKeyUp}
-                className="lp-input"
-                placeholder="••••••••"
-                required
-                autoComplete="current-password"
-              />
-              <BehavioralCaptureIndicator isCapturing={isCapturing} />
+              <div className="lp-input-wrapper">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onKeyUp={handleKeyUp}
+                  className="lp-input"
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                />
+                <BehavioralCaptureIndicator isCapturing={isCapturing} />
+              </div>
             </div>
 
-            {/* Helper links */}
             <div className="lp-links">
-              <Link to="/auth/enroll" className="lp-link">
-                Use Hardware Token
-              </Link>
-              <Link to="/auth/register" className="lp-link">
-                New operator? Register
-              </Link>
+              <Link to="/auth/enroll" className="lp-link">Use Hardware Token</Link>
+              <Link to="/auth/register" className="lp-link">New operator? Register</Link>
             </div>
 
-            {/* Submit button */}
-            <button
+            <motion.button
               type="submit"
-              disabled={isLoading}
-              className={`lp-btn${isLoading ? ' lp-btn--loading' : ''}`}
+              disabled={isLoading || loginSuccess}
+              whileTap={!isLoading && !loginSuccess ? { scale: 0.97 } : {}}
+              className={`lp-btn${isLoading || loginSuccess ? ' lp-btn--loading' : ''}${loginSuccess ? ' lp-btn--success' : ''}`}
             >
-              {isLoading ? (
+              {loginSuccess ? (
+                <span className="lp-btn-inner" style={{ color: '#064e3b' }}>
+                  ACCESS GRANTED ✓
+                </span>
+              ) : isLoading ? (
                 <span className="lp-btn-inner">
                   <Loader2 className="lp-spinner" />
-                  COMPILING ACCESS TOKENS...
+                  VERIFYING ACCESS...
                 </span>
               ) : (
-                <>EXECUTE SECURE AUTH &nbsp;→</>
+                <>SIGN IN TO DASHBOARD &nbsp;→</>
               )}
-            </button>
+            </motion.button>
           </form>
         </motion.div>
       </div>
 
       <style>{`
-        /* ── Google Fonts ─────────────────────────────────────── */
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-        /* ── Root Layout ──────────────────────────────────────── */
         .lp-root {
-          display: grid;
-          grid-template-columns: 55% 45%;
-          min-height: 100vh;
-          width: 100%;
-          background-color: #080808;
-          position: relative;
-          overflow: hidden;
-          font-family: 'Space Grotesk', system-ui, sans-serif;
-        }
-
-        /* ── Atmospheric neon glow ────────────────────────────── */
-        .lp-glow-overlay {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(
-            ellipse 60% 60% at 15% 50%,
-            rgba(170, 255, 0, 0.12) 0%,
-            rgba(170, 255, 0, 0.03) 40%,
-            transparent 70%
-          );
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        /* ── Hero Left Column ─────────────────────────────────── */
-        .lp-hero-col {
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
-          padding: 4rem 3rem 4rem 5rem;
-          position: relative;
-          z-index: 1;
-        }
-
-        .lp-hero-content {
-          max-width: 520px;
-        }
-
-        .lp-hero-heading {
-          font-family: 'Space Grotesk', sans-serif;
-          font-size: clamp(2.5rem, 5vw, 4.5rem);
-          font-weight: 700;
-          letter-spacing: -2px;
-          color: #FFFFFF;
-          text-transform: uppercase;
-          line-height: 0.95;
-          margin: 0 0 1.5rem 0;
-        }
-
-        .lp-hero-tagline {
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 11px;
-          letter-spacing: 3px;
-          text-transform: uppercase;
-          color: #AAFF00;
-          margin: 0;
-        }
-
-        /* ── Auth Card Right Column ───────────────────────────── */
-        .lp-card-col {
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 2rem 3rem 2rem 1.5rem;
+          min-height: calc(100vh - 60px);
+          width: 100%;
+          position: relative;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .lp-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(7, 26, 51, 0.75);
+          z-index: 0;
+        }
+
+        .lp-content {
           position: relative;
           z-index: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          width: 100%;
+          padding: 2rem;
+        }
+
+        .lp-branding {
+          text-align: center;
+          margin-bottom: 2.5rem;
+        }
+
+        .lp-brand-title {
+          font-size: 2.5rem;
+          font-weight: 700;
+          margin: 0 0 0.5rem 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+        }
+
+        .lp-brand-su {
+          color: #FFFFFF;
+        }
+
+        .lp-brand-raksha {
+          background: linear-gradient(to right, #FF8A00, #FFC107);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .lp-brand-tagline {
+          color: #E2E8F0;
+          font-size: 1rem;
+          margin: 0;
+          opacity: 0.9;
         }
 
         .lp-card {
-          background: rgba(13, 17, 23, 0.85);
-          border: 1px solid rgba(170, 255, 0, 0.18);
-          border-radius: 16px;
+          background: rgba(11, 31, 58, 0.6);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 20px;
           padding: 2.5rem;
-          backdrop-filter: blur(12px) saturate(1.2);
-          max-width: 420px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+          max-width: 440px;
           width: 100%;
-          position: relative;
         }
 
-        /* ── Card Header ──────────────────────────────────────── */
         .lp-card-header {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 1.75rem;
+          margin-bottom: 2rem;
         }
 
         .lp-card-title {
-          font-family: 'Space Grotesk', sans-serif;
-          font-size: 18px;
+          font-size: 1.5rem;
           font-weight: 700;
-          letter-spacing: 1px;
           color: #FFFFFF;
-          text-transform: uppercase;
-          margin: 0 0 0.35rem 0;
+          margin: 0 0 0.5rem 0;
         }
 
         .lp-card-subtitle {
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 10px;
-          letter-spacing: 3px;
-          text-transform: uppercase;
-          color: #AAFF00;
+          font-size: 0.875rem;
+          color: #CBD5E1;
           margin: 0;
         }
 
-        /* ── Form ─────────────────────────────────────────────── */
         .lp-form {
           display: flex;
           flex-direction: column;
-          gap: 1.25rem;
+          gap: 1.5rem;
         }
 
-        /* ── Error ────────────────────────────────────────────── */
         .lp-error {
           display: flex;
           align-items: center;
           gap: 0.5rem;
           padding: 0.75rem 1rem;
-          background: rgba(255, 68, 68, 0.08);
-          border: 1px solid rgba(255, 68, 68, 0.3);
-          border-radius: 8px;
-          color: #FF4444;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.5px;
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          border-radius: 12px;
+          color: #F87171;
+          font-size: 0.875rem;
+          font-weight: 500;
         }
 
         .lp-error-icon {
-          width: 16px;
-          height: 16px;
+          width: 18px;
+          height: 18px;
           flex-shrink: 0;
         }
 
-        /* ── Fields ───────────────────────────────────────────── */
         .lp-field {
           display: flex;
           flex-direction: column;
@@ -381,46 +351,50 @@ export const LoginPage = () => {
         }
 
         .lp-label {
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 10px;
-          letter-spacing: 3px;
-          color: #A0A0A0;
-          text-transform: uppercase;
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #F1F5F9;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 0.5rem;
         }
 
         .lp-label-icon {
-          width: 14px;
-          height: 14px;
-          color: #AAFF00;
+          width: 16px;
+          height: 16px;
+          color: #FFC107;
+        }
+
+        .lp-input-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+          width: 100%;
         }
 
         .lp-input {
-          background: #111318;
-          border: 1px solid rgba(170, 255, 0, 0.15);
-          border-radius: 8px;
+          background: rgba(7, 26, 51, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
           color: #FFFFFF;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 14px;
+          font-size: 1rem;
           padding: 12px 16px;
           width: 100%;
           outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
+          transition: all 0.2s ease;
           box-sizing: border-box;
         }
 
         .lp-input::placeholder {
-          color: #4A4A4A;
+          color: #94A3B8;
         }
 
         .lp-input:focus {
-          border-color: rgba(170, 255, 0, 0.6);
-          box-shadow: 0 0 0 3px rgba(170, 255, 0, 0.08);
+          border-color: #FF8A00;
+          background: rgba(7, 26, 51, 0.8);
+          box-shadow: 0 0 0 3px rgba(255, 138, 0, 0.15);
         }
 
-        /* ── Helper Links ─────────────────────────────────────── */
         .lp-links {
           display: flex;
           align-items: center;
@@ -428,55 +402,53 @@ export const LoginPage = () => {
         }
 
         .lp-link {
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 11px;
-          color: rgba(170, 255, 0, 0.6);
+          font-size: 0.875rem;
+          color: #CBD5E1;
           text-decoration: none;
-          letter-spacing: 0.5px;
-          transition: color 0.2s;
+          transition: color 0.2s ease;
         }
 
         .lp-link:hover {
-          color: #AAFF00;
+          color: #FFC107;
         }
 
-        /* ── CTA Button ───────────────────────────────────────── */
         .lp-btn {
-          background: #AAFF00;
-          color: #080808;
+          background: linear-gradient(to right, #FF8A00, #FFC107);
+          color: #000000;
           border: none;
-          border-radius: 8px;
+          border-radius: 12px;
           width: 100%;
           padding: 14px 24px;
-          font-family: 'Space Grotesk', sans-serif;
-          font-size: 13px;
-          font-weight: 700;
-          letter-spacing: 2.5px;
-          text-transform: uppercase;
+          font-size: 1rem;
+          font-weight: 600;
           cursor: pointer;
           position: relative;
-          overflow: hidden;
-          transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+          transition: all 0.3s ease;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
         .lp-btn:hover:not(.lp-btn--loading) {
-          background: #CCFF00;
-          box-shadow: 0 0 24px rgba(170, 255, 0, 0.4);
-          transform: translateY(-1px);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(255, 138, 0, 0.4);
         }
 
         .lp-btn:active:not(.lp-btn--loading) {
           transform: translateY(0px);
-          box-shadow: 0 0 12px rgba(170, 255, 0, 0.25);
+          box-shadow: 0 4px 10px rgba(255, 138, 0, 0.2);
         }
 
         .lp-btn--loading {
-          background: rgba(170, 255, 0, 0.3);
-          color: rgba(8, 8, 8, 0.5);
+          opacity: 0.7;
           cursor: not-allowed;
+        }
+
+        .lp-btn--success {
+          background: #4ade80 !important;
+          color: #064e3b !important;
+          opacity: 1;
+          cursor: default;
         }
 
         .lp-btn-inner {
@@ -486,8 +458,8 @@ export const LoginPage = () => {
         }
 
         .lp-spinner {
-          width: 16px;
-          height: 16px;
+          width: 18px;
+          height: 18px;
           animation: spin 1s linear infinite;
         }
 
@@ -496,23 +468,15 @@ export const LoginPage = () => {
           to { transform: rotate(360deg); }
         }
 
-        /* ── Mobile Responsive ────────────────────────────────── */
-        @media (max-width: 768px) {
-          .lp-root {
-            grid-template-columns: 1fr;
+        @media (max-width: 640px) {
+          .lp-content {
+            padding: 1rem;
           }
-
-          .lp-hero-col {
-            display: none;
-          }
-
-          .lp-card-col {
-            padding: 1.5rem;
-            min-height: 100vh;
-          }
-
           .lp-card {
-            max-width: 100%;
+            padding: 2rem 1.5rem;
+          }
+          .lp-brand-title {
+            font-size: 2rem;
           }
         }
       `}</style>

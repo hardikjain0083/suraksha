@@ -539,20 +539,23 @@ export function AdminDashboard() {
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto pb-10 px-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-cyan/15 pb-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#B8FF00]/10 pb-5 mb-6">
         <div>
-          <h1 className="text-2xl font-bold font-mono tracking-wider text-cyber-cyan flex items-center gap-2">
-            <Shield className="w-6 h-6 text-cyber-cyan animate-pulse-glow" />
+          <span className="font-mono text-[9px] font-bold tracking-[2.5px] uppercase text-[#B8FF00] opacity-80 mb-2 block">
+            // SYSTEM COMMAND MODULE
+          </span>
+          <h1 className="text-3xl font-bold font-sans text-[#F4F7F2] tracking-tight uppercase flex items-center gap-3">
+            <Shield className="w-7 h-7 text-[#B8FF00]" />
             ADMINISTRATOR COMMAND CENTER
           </h1>
-          <p className="text-xs text-muted-foreground font-mono mt-1">
-            Real-time compliance monitoring, prefix-based category routing, and cross-reference regression logs.
+          <p className="text-[11px] text-[#A7ADA7] font-mono tracking-widest mt-2 uppercase">
+            Compliance Monitoring • Category Routing • Regression Logs
           </p>
         </div>
-        <div className="flex gap-2">
+        <div>
           <button 
             onClick={() => { fetchGaps(); fetchPolicies(); fetchNotifications(); fetchOrphans(); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-cyber-cyan/35 hover:border-cyber-cyan bg-obsidian-950 hover:bg-cyber-cyan/5 rounded text-xs font-mono text-cyber-cyan"
+            className="flex items-center gap-2 px-4 py-2 border border-[#B8FF00]/30 hover:border-[#B8FF00] bg-[#B8FF00]/5 hover:bg-[#B8FF00]/10 rounded text-[11px] font-bold uppercase font-mono text-[#B8FF00] transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Sync Data
           </button>
@@ -561,63 +564,84 @@ export function AdminDashboard() {
 
       {/* Notifications Banners */}
       {successMsg && (
-        <div className="p-3 bg-emerald-950/30 border border-emerald-500/40 text-emerald-400 text-xs font-mono rounded">
-          {successMsg.toUpperCase()}
+        <div className="p-3 mb-6 bg-emerald-950/20 border border-emerald-500/30 text-emerald-400 text-[10px] uppercase font-bold tracking-wider font-mono rounded">
+          {successMsg}
         </div>
       )}
       {errorMsg && (
-        <div className="p-3 bg-red-950/30 border border-red-500/40 text-red-400 text-xs font-mono rounded">
-          {errorMsg.toUpperCase()}
+        <div className="p-3 mb-6 bg-red-950/20 border border-red-500/30 text-red-400 text-[10px] uppercase font-bold tracking-wider font-mono rounded">
+          {errorMsg}
         </div>
       )}
 
       {/* KPI stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <GlassCard className="p-4 border-cyber-cyan/15">
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Active Policy Gaps</span>
-          <h3 className="text-3xl font-bold font-mono text-cyber-cyan mt-1">{activeGapsCount}</h3>
-        </GlassCard>
-        <GlassCard className="p-4 border-cyber-magenta/15">
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Awaiting HOD Approvals</span>
-          <h3 className="text-3xl font-bold font-mono text-cyber-magenta mt-1">{resolvedGapsPendingApproval}</h3>
-        </GlassCard>
-        <GlassCard className="p-4 border-amber-500/15">
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">New Policies Required</span>
-          <h3 className="text-3xl font-bold font-mono text-amber-400 mt-1">{newPolicyRequiredGaps.length}</h3>
-        </GlassCard>
-        <GlassCard className="p-4 border-cyber-green/15">
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Orphaned Directives</span>
-          <h3 className="text-3xl font-bold font-mono text-cyber-green mt-1">{orphanedDirectives.length}</h3>
-        </GlassCard>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="bg-[#101411]/90 border border-[#B8FF00]/10 rounded-lg p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#B8FF00]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <span className="text-[9px] font-mono text-[#A7ADA7] font-bold tracking-widest uppercase mb-2">Active Policy Gaps</span>
+          <div className="flex items-end justify-between">
+            <h3 className="text-4xl font-sans font-bold text-[#F4F7F2]">{activeGapsCount}</h3>
+            <span className="text-[10px] font-mono text-amber-400 border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 rounded">PENDING</span>
+          </div>
+        </div>
+        <div className="bg-[#101411]/90 border border-[#B8FF00]/10 rounded-lg p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#B8FF00]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <span className="text-[9px] font-mono text-[#A7ADA7] font-bold tracking-widest uppercase mb-2">Awaiting HOD Approvals</span>
+          <div className="flex items-end justify-between">
+            <h3 className="text-4xl font-sans font-bold text-[#F4F7F2]">{resolvedGapsPendingApproval}</h3>
+            <span className="text-[10px] font-mono text-[#B8FF00] border border-[#B8FF00]/20 bg-[#B8FF00]/10 px-2 py-0.5 rounded">REVIEW</span>
+          </div>
+        </div>
+        <div className="bg-[#101411]/90 border border-[#B8FF00]/10 rounded-lg p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#B8FF00]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <span className="text-[9px] font-mono text-[#A7ADA7] font-bold tracking-widest uppercase mb-2">New Policies Required</span>
+          <div className="flex items-end justify-between">
+            <h3 className="text-4xl font-sans font-bold text-[#F4F7F2]">{newPolicyRequiredGaps.length}</h3>
+            <span className="text-[10px] font-mono text-cyan-400 border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 rounded">ACTION</span>
+          </div>
+        </div>
+        <div className="bg-[#101411]/90 border border-[#B8FF00]/10 rounded-lg p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#B8FF00]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <span className="text-[9px] font-mono text-[#A7ADA7] font-bold tracking-widest uppercase mb-2">Orphaned Directives</span>
+          <div className="flex items-end justify-between">
+            <h3 className="text-4xl font-sans font-bold text-[#F4F7F2]">{orphanedDirectives.length}</h3>
+            <span className="text-[10px] font-mono text-red-400 border border-red-400/20 bg-red-400/10 px-2 py-0.5 rounded">URGENT</span>
+          </div>
+        </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex border-b border-cyber-cyan/10">
-        {(['gaps', 'upload', 'circulars', 'approvals', 'policies', 'orphans', 'audit'] as const).map(tab => {
-          const active = activeTab === tab;
-          const labels = {
-            gaps: 'Remediation Queue',
-            upload: 'Ingest Center',
-            circulars: 'Circulars Repo',
-            approvals: `Pending Updates (${resolvedGapsPendingApproval})`,
-            policies: 'Core Policy Repository',
-            orphans: `Orphaned Directives (${orphanedDirectives.length})`,
-            audit: 'Audit Ledger'
-          };
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-3 font-mono text-xs font-bold transition-all border-b-2 ${
-                active 
-                  ? 'border-cyber-cyan text-cyber-cyan bg-cyber-cyan/5' 
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {labels[tab]}
-            </button>
-          );
-        })}
+      <div className="flex overflow-x-auto border-b border-[#B8FF00]/10 mb-6" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex gap-2 pb-1 min-w-max">
+          {(['gaps', 'upload', 'circulars', 'approvals', 'policies', 'orphans', 'audit'] as const).map(tab => {
+            const active = activeTab === tab;
+            const labels: Record<string, {text: string, icon: any}> = {
+              gaps: { text: 'Remediation Queue', icon: Layers2 },
+              upload: { text: 'Ingest Center', icon: Upload },
+              circulars: { text: 'Circulars Repo', icon: BookOpen },
+              approvals: { text: `Pending Updates (${resolvedGapsPendingApproval})`, icon: Shield },
+              policies: { text: 'Core Policy Repository', icon: FileText },
+              orphans: { text: `Orphaned Directives (${orphanedDirectives.length})`, icon: AlertTriangle },
+              audit: { text: 'Audit Ledger', icon: CheckCircle }
+            };
+            const Info = labels[tab];
+            const Icon = Info.icon;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex items-center gap-2 px-4 py-2.5 font-mono text-[11px] font-bold uppercase transition-all rounded-t-lg border-b-2 ${
+                  active 
+                    ? 'border-[#B8FF00] text-[#B8FF00] bg-[#B8FF00]/5 drop-shadow-[0_0_8px_rgba(184,255,0,0.3)]' 
+                    : 'border-transparent text-[#A7ADA7] hover:text-[#F4F7F2] hover:bg-[#101411]'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {Info.text}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* GAPS PANEL */}
@@ -625,62 +649,79 @@ export function AdminDashboard() {
         <div className="space-y-6">
           {/* SVG Charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <GlassCard className="p-4 border-cyber-cyan/10">
-              <h3 className="text-xs font-mono font-bold text-slate-400 uppercase mb-3">Gaps by Department</h3>
-              <div className="flex justify-center items-center h-48">
+            <div className="bg-[#101411]/50 border border-[#B8FF00]/10 rounded-lg p-4">
+              <h3 className="text-[10px] font-mono font-bold text-[#A7ADA7] tracking-widest uppercase mb-4">Gaps by Department</h3>
+              <div className="flex justify-center items-center h-48 border border-white/5 bg-black/20 rounded-md relative">
+                {/* Horizontal grid lines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 py-4">
+                  <div className="border-t border-[#A7ADA7] w-full" />
+                  <div className="border-t border-[#A7ADA7] w-full" />
+                  <div className="border-t border-[#A7ADA7] w-full" />
+                  <div className="border-t border-[#A7ADA7] w-full" />
+                </div>
                 {getDeptAnalyticsData().length === 0 ? (
-                  <span className="text-xs text-slate-500 font-mono">No active gaps to chart</span>
+                  <span className="text-[10px] text-[#A7ADA7] font-mono tracking-widest uppercase">No active gaps to chart</span>
                 ) : (
-                  <svg width="100%" height="100%" viewBox="0 0 400 180">
+                  <svg width="100%" height="100%" viewBox="0 0 400 180" className="relative z-10">
                     {getDeptAnalyticsData().map((item, idx) => {
                       const barWidth = (item.value / Math.max(...getDeptAnalyticsData().map(d => d.value))) * 220;
                       const yPos = idx * 24 + 10;
                       return (
                         <g key={item.name}>
-                          <text x="10" y={yPos + 14} fill="#94a3b8" className="text-[10px] font-mono">{item.name}</text>
-                          <rect x="130" y={yPos} width={barWidth} height="16" fill="#06b6d4" rx="2" className="transition-all hover:fill-[#d946ef]" />
-                          <text x={135 + barWidth} y={yPos + 12} fill="#06b6d4" className="text-[10px] font-mono font-bold">{item.value}</text>
+                          <text x="10" y={yPos + 14} fill="#A7ADA7" className="text-[9px] font-mono tracking-wider">{item.name}</text>
+                          <rect x="130" y={yPos} width={barWidth} height="14" fill="#06b6d4" rx="1" className="transition-all duration-300 hover:fill-[#B8FF00]" />
+                          <text x={135 + barWidth} y={yPos + 11} fill="#F4F7F2" className="text-[9px] font-mono font-bold">{item.value}</text>
                         </g>
                       );
                     })}
                   </svg>
                 )}
               </div>
-            </GlassCard>
+            </div>
             
-            <GlassCard className="p-4 border-cyber-cyan/10">
-              <h3 className="text-xs font-mono font-bold text-slate-400 uppercase mb-3">Gaps by Severity</h3>
-              <div className="flex justify-center items-center h-48">
+            <div className="bg-[#101411]/50 border border-[#B8FF00]/10 rounded-lg p-4">
+              <h3 className="text-[10px] font-mono font-bold text-[#A7ADA7] tracking-widest uppercase mb-4">Gaps by Severity</h3>
+              <div className="flex justify-center items-center h-48 border border-white/5 bg-black/20 rounded-md relative">
+                {/* Horizontal grid lines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 py-4">
+                  <div className="border-t border-[#A7ADA7] w-full" />
+                  <div className="border-t border-[#A7ADA7] w-full" />
+                  <div className="border-t border-[#A7ADA7] w-full" />
+                  <div className="border-t border-[#A7ADA7] w-full" />
+                </div>
                 {getSeverityAnalyticsData().filter(d => d.value > 0).length === 0 ? (
-                  <span className="text-xs text-slate-500 font-mono">No active gaps to chart</span>
+                  <span className="text-[10px] text-[#A7ADA7] font-mono tracking-widest uppercase">No active gaps to chart</span>
                 ) : (
-                  <svg width="100%" height="100%" viewBox="0 0 400 180">
+                  <svg width="100%" height="100%" viewBox="0 0 400 180" className="relative z-10">
                     {getSeverityAnalyticsData().map((item, idx) => {
                       const barHeight = (item.value / Math.max(1, ...getSeverityAnalyticsData().map(d => d.value))) * 110;
                       const xPos = idx * 80 + 50;
-                      const severityColors = ["#ef4444", "#f59e0b", "#3b82f6", "#10b981"];
+                      const severityColors = ["#ef4444", "#f59e0b", "#B8FF00", "#10b981"];
                       return (
                         <g key={item.name}>
-                          <rect x={xPos} y={130 - barHeight} width="40" height={barHeight} fill={severityColors[idx]} rx="2" />
-                          <text x={xPos + 20} y={145} textAnchor="middle" fill="#94a3b8" className="text-[9px] font-mono">{item.name}</text>
-                          <text x={xPos + 20} y={125 - barHeight} textAnchor="middle" fill="#f8fafc" className="text-[10px] font-mono font-bold">{item.value}</text>
+                          <rect x={xPos} y={130 - barHeight} width="36" height={barHeight} fill={severityColors[idx]} rx="1" className="transition-all duration-300 hover:opacity-80" />
+                          <text x={xPos + 18} y={148} textAnchor="middle" fill="#A7ADA7" className="text-[9px] font-mono uppercase tracking-wider">{item.name}</text>
+                          <text x={xPos + 18} y={124 - barHeight} textAnchor="middle" fill="#F4F7F2" className="text-[10px] font-mono font-bold">{item.value}</text>
                         </g>
                       );
                     })}
                   </svg>
                 )}
               </div>
-            </GlassCard>
+            </div>
           </div>
 
           {/* Filters and Controls */}
-          <GlassCard className="p-4 border-cyber-cyan/10 font-mono text-xs flex flex-wrap gap-4 items-center justify-between">
-            <div className="flex flex-wrap gap-2 items-center">
-              <Filter className="w-4 h-4 text-cyber-cyan" />
+          <div className="bg-[#101411]/80 border border-[#B8FF00]/10 rounded-lg p-4 font-mono text-[10px] flex flex-wrap gap-4 items-center justify-between mt-6">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2 text-[#A7ADA7] uppercase tracking-widest bg-black/40 px-2 py-1 rounded border border-white/5">
+                <Filter className="w-3.5 h-3.5 text-[#B8FF00]" />
+                Filters
+              </div>
               <select
                 value={filterDept}
                 onChange={(e) => setFilterDept(e.target.value)}
-                className="bg-obsidian-950 border border-cyber-cyan/20 text-slate-300 p-1.5 rounded"
+                className="bg-[#0B0D0C] border border-[#B8FF00]/20 focus:border-[#B8FF00]/50 text-[#F4F7F2] p-1.5 rounded outline-none uppercase tracking-wide cursor-pointer transition-colors"
               >
                 <option value="">All Departments</option>
                 <option value="DEPT-COMPLIANCE">Compliance</option>
@@ -694,7 +735,7 @@ export function AdminDashboard() {
               <select
                 value={filterSeverity}
                 onChange={(e) => setFilterSeverity(e.target.value)}
-                className="bg-obsidian-950 border border-cyber-cyan/20 text-slate-300 p-1.5 rounded"
+                className="bg-[#0B0D0C] border border-[#B8FF00]/20 focus:border-[#B8FF00]/50 text-[#F4F7F2] p-1.5 rounded outline-none uppercase tracking-wide cursor-pointer transition-colors"
               >
                 <option value="">All Severities</option>
                 <option value="critical">Critical</option>
@@ -705,7 +746,7 @@ export function AdminDashboard() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-obsidian-950 border border-cyber-cyan/20 text-slate-300 p-1.5 rounded"
+                className="bg-[#0B0D0C] border border-[#B8FF00]/20 focus:border-[#B8FF00]/50 text-[#F4F7F2] p-1.5 rounded outline-none uppercase tracking-wide cursor-pointer transition-colors"
               >
                 <option value="">All Statuses</option>
                 <option value="assigned">Assigned</option>
@@ -714,14 +755,17 @@ export function AdminDashboard() {
                 <option value="superseded">Superseded</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-400 hover:text-slate-200 ml-2">
-                <input 
-                  type="checkbox" 
-                  checked={groupByDay} 
-                  onChange={(e) => setGroupByDay(e.target.checked)} 
-                  className="rounded border-cyber-cyan/20 bg-obsidian-950" 
-                />
-                Group by Day (Timeline)
+              <label className="flex items-center gap-2 cursor-pointer text-[#A7ADA7] hover:text-[#B8FF00] ml-2 transition-colors group">
+                <div className="relative flex items-center justify-center w-4 h-4 border border-[#B8FF00]/30 rounded bg-[#0B0D0C] group-hover:border-[#B8FF00]/60 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    checked={groupByDay} 
+                    onChange={(e) => setGroupByDay(e.target.checked)} 
+                    className="absolute opacity-0 w-full h-full cursor-pointer" 
+                  />
+                  {groupByDay && <Check className="w-3 h-3 text-[#B8FF00] pointer-events-none" />}
+                </div>
+                <span className="uppercase tracking-wider">Timeline Grouping</span>
               </label>
             </div>
             {selectedGapIds.length > 0 && (
@@ -775,7 +819,7 @@ export function AdminDashboard() {
                 </button>
               </div>
             )}
-          </GlassCard>
+          </div>
 
           {/* New Policy Required Alert */}
           {newPolicyRequiredGaps.length > 0 && (
@@ -797,65 +841,68 @@ export function AdminDashboard() {
           )}
 
           {/* Gaps Queue */}
-          <GlassCard className="p-6 border-cyber-cyan/10">
+          <div className="bg-[#101411]/50 border border-[#B8FF00]/10 rounded-lg p-6">
             {loadingGaps ? (
-              <div className="text-center py-12 text-slate-400 font-mono text-xs animate-pulse">Syncing ledger data...</div>
+              <div className="text-center py-12 text-[#A7ADA7] font-mono text-[11px] animate-pulse uppercase tracking-widest">Syncing ledger data...</div>
             ) : filteredGaps.length === 0 ? (
-              <div className="text-center py-16 text-slate-500 font-mono text-xs">No matching gaps found. Adjust filters or upload a circular to verify compliance.</div>
+              <div className="text-center py-16 text-[#A7ADA7] font-mono text-[11px] uppercase tracking-widest">No matching gaps found. Adjust filters or upload a circular to verify compliance.</div>
             ) : groupByDay ? (
               // Grouped chronological view
               <div className="space-y-6">
                 {Object.entries(getGapsGroupedByDay()).map(([day, items]) => (
-                  <div key={day} className="space-y-2">
-                    <h3 className="text-xs font-mono font-bold text-cyber-cyan border-b border-cyber-cyan/15 pb-1 flex items-center gap-1.5 uppercase">
+                  <div key={day} className="space-y-3">
+                    <h3 className="text-[10px] font-mono font-bold text-[#B8FF00] border-b border-[#B8FF00]/10 pb-2 mb-3 flex items-center gap-2 uppercase tracking-widest">
                       <Clock className="w-3.5 h-3.5" /> {day}
                     </h3>
                     <div className="grid grid-cols-1 gap-2">
                       {items.map(gap => (
-                        <div key={gap.gap_id} className="p-3 bg-obsidian-950/60 border border-cyber-cyan/10 rounded-lg flex flex-wrap justify-between items-center gap-4 text-xs font-mono">
-                          <div className="flex items-center gap-3">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedGapIds.includes(gap.gap_id)}
-                              onChange={() => toggleSelectGap(gap.gap_id)}
-                              className="rounded border-cyber-cyan/20 bg-obsidian-950 text-cyber-cyan"
-                            />
+                        <div key={gap.gap_id} className="p-4 bg-[#0B0D0C]/80 border border-white/5 hover:border-[#B8FF00]/30 transition-colors rounded-lg flex flex-wrap justify-between items-center gap-4 text-[11px] font-mono">
+                          <div className="flex items-start gap-4">
+                            <label className="relative flex items-center justify-center w-4 h-4 border border-[#B8FF00]/30 rounded bg-[#101411] cursor-pointer hover:border-[#B8FF00]/60 transition-colors mt-0.5">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedGapIds.includes(gap.gap_id)}
+                                onChange={() => toggleSelectGap(gap.gap_id)}
+                                className="absolute opacity-0 w-full h-full cursor-pointer"
+                              />
+                              {selectedGapIds.includes(gap.gap_id) && <Check className="w-3 h-3 text-[#B8FF00] pointer-events-none" />}
+                            </label>
                             <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-cyber-magenta">{gap.gap_id}</span>
-                                <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold ${
-                                  gap.severity === 'critical' ? 'bg-red-500/10 text-red-400' :
-                                  gap.severity === 'high' ? 'bg-amber-500/10 text-amber-400' :
-                                  'bg-blue-500/10 text-blue-400'
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-bold text-[#F4F7F2] text-xs">{gap.gap_id}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider ${
+                                  gap.severity === 'critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                  gap.severity === 'high' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                  'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
                                 }`}>
                                   {gap.severity.toUpperCase()}
                                 </span>
                                 {gap.source === 'fix_regression' && (
-                                  <span className="px-1.5 py-0.2 bg-purple-500/15 text-purple-400 rounded text-[8px] font-bold">REGRESSION</span>
+                                  <span className="px-1.5 py-0.5 bg-purple-500/15 text-purple-400 border border-purple-500/20 rounded text-[9px] font-bold tracking-wider">REGRESSION</span>
                                 )}
                               </div>
-                              <p className="text-slate-200 mt-1 font-sans">{gap.circular_title}</p>
-                              <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5" title={gap.clause_text}>{gap.clause_text}</p>
+                              <p className="text-[#A7ADA7] font-sans text-sm leading-snug">{gap.circular_title}</p>
+                              <p className="text-[10px] text-[#A7ADA7]/70 line-clamp-1 mt-1 font-sans">{gap.clause_text}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-6">
                             <div className="text-right">
-                              <p className="text-cyber-blue font-bold">{gap.department_id?.replace("DEPT-", "")}</p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">{gap.assigned_employee || 'Unassigned'}</p>
+                              <p className="text-[#B8FF00] font-bold tracking-widest uppercase">{gap.department_id?.replace("DEPT-", "")}</p>
+                              <p className="text-[9px] text-[#A7ADA7] mt-1 tracking-wider">{gap.assigned_employee || 'UNASSIGNED'}</p>
                             </div>
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                            <span className={`px-2 py-1 rounded-sm text-[9px] font-bold tracking-wider uppercase ${
                               gap.triage_status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                               gap.triage_status === 'superseded' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                              gap.triage_status === 'cancelled' ? 'bg-slate-700/20 text-slate-500' :
+                              gap.triage_status === 'cancelled' ? 'bg-white/5 text-[#A7ADA7] border border-white/10' :
                               'bg-red-500/10 text-red-400 border border-red-500/20'
                             }`}>
-                              {gap.triage_status.toUpperCase()}
+                              {gap.triage_status}
                             </span>
                             <div className="flex gap-1">
                               {gap.triage_status === 'assigned' && (
                                 <button 
                                   onClick={() => handleCancelGap(gap.gap_id)}
-                                  className="p-1 hover:text-red-400 text-slate-400 rounded hover:bg-white/5"
+                                  className="p-1.5 hover:text-red-400 text-[#A7ADA7] rounded hover:bg-red-500/10 transition-colors"
                                   title="Cancel Gap"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -871,98 +918,105 @@ export function AdminDashboard() {
               </div>
             ) : (
               // Table List View
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse font-mono text-xs">
+              <div className="overflow-x-auto rounded-lg border border-white/5 bg-[#0B0D0C]/50">
+                <table className="w-full text-left border-collapse font-mono text-[11px]">
                   <thead>
-                    <tr className="border-b border-cyber-cyan/20 text-slate-400 text-[10px] uppercase">
-                      <th className="pb-3 pl-2">
-                        <input 
-                          type="checkbox" 
-                          checked={filteredGaps.length > 0 && filteredGaps.every(g => selectedGapIds.includes(g.gap_id))}
-                          onChange={() => toggleSelectAll(filteredGaps)}
-                          className="rounded border-cyber-cyan/20 bg-obsidian-950"
-                        />
-                      </th>
-                      <th className="pb-3">Gap ID</th>
-                      <th className="pb-3">Circular Guideline</th>
-                      <th className="pb-3 text-center">Page</th>
-                      <th className="pb-3">Policy & Line</th>
-                      <th className="pb-3">Department</th>
-                      <th className="pb-3">Assignee</th>
-                      <th className="pb-3">Status</th>
-                      <th className="pb-3 text-right pr-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-cyber-cyan/5">
-                    {filteredGaps.map(gap => (
-                      <tr key={gap.gap_id} className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setSelectedGap(gap)}>
-                        <td className="py-4 pl-2" onClick={(e) => e.stopPropagation()}>
+                    <tr className="border-b border-[#B8FF00]/10 text-[#A7ADA7] bg-[#101411]/80 uppercase tracking-widest text-[9px]">
+                      <th className="py-4 pl-4 pr-2 w-10">
+                        <label className="relative flex items-center justify-center w-4 h-4 border border-[#B8FF00]/30 rounded bg-[#0B0D0C] cursor-pointer hover:border-[#B8FF00]/60 transition-colors">
                           <input 
                             type="checkbox" 
-                            checked={selectedGapIds.includes(gap.gap_id)}
-                            onChange={() => toggleSelectGap(gap.gap_id)}
-                            className="rounded border-cyber-cyan/20 bg-obsidian-950 text-cyber-cyan"
+                            checked={filteredGaps.length > 0 && filteredGaps.every(g => selectedGapIds.includes(g.gap_id))}
+                            onChange={() => toggleSelectAll(filteredGaps)}
+                            className="absolute opacity-0 w-full h-full cursor-pointer"
                           />
+                          {filteredGaps.length > 0 && filteredGaps.every(g => selectedGapIds.includes(g.gap_id)) && <Check className="w-3 h-3 text-[#B8FF00] pointer-events-none" />}
+                        </label>
+                      </th>
+                      <th className="py-4 px-3 font-bold">Gap ID</th>
+                      <th className="py-4 px-3 font-bold">Circular Guideline</th>
+                      <th className="py-4 px-3 text-center font-bold">Page</th>
+                      <th className="py-4 px-3 font-bold">Policy & Line</th>
+                      <th className="py-4 px-3 font-bold">Department</th>
+                      <th className="py-4 px-3 font-bold">Assignee</th>
+                      <th className="py-4 px-3 font-bold">Status</th>
+                      <th className="py-4 px-4 text-right font-bold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {filteredGaps.map(gap => (
+                      <tr key={gap.gap_id} className="hover:bg-[#B8FF00]/5 transition-colors cursor-pointer group" onClick={() => setSelectedGap(gap)}>
+                        <td className="py-4 pl-4 pr-2" onClick={(e) => e.stopPropagation()}>
+                          <label className="relative flex items-center justify-center w-4 h-4 border border-[#B8FF00]/30 rounded bg-[#0B0D0C] cursor-pointer group-hover:border-[#B8FF00]/60 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedGapIds.includes(gap.gap_id)}
+                              onChange={() => toggleSelectGap(gap.gap_id)}
+                              className="absolute opacity-0 w-full h-full cursor-pointer"
+                            />
+                            {selectedGapIds.includes(gap.gap_id) && <Check className="w-3 h-3 text-[#B8FF00] pointer-events-none" />}
+                          </label>
                         </td>
-                        <td className="py-4 font-bold text-cyber-magenta">
+                        <td className="py-4 px-3 font-bold text-[#F4F7F2]">
                           {gap.gap_id}
-                          <div className="mt-0.5">
-                            <span className={`px-1 rounded text-[8px] font-bold uppercase ${
+                          <div className="mt-1">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase ${
                               gap.severity === 'critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                              gap.severity === 'high' ? 'bg-amber-500/10 text-amber-400' :
-                              'bg-blue-500/10 text-blue-400'
+                              gap.severity === 'high' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                              'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
                             }`}>
                               {gap.severity}
                             </span>
                           </div>
                         </td>
-                        <td className="py-4 max-w-[320px]">
-                          <p className="text-slate-200 font-semibold truncate" title={gap.circular_title}>{gap.circular_title}</p>
-                          <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5" title={gap.clause_text}>{gap.clause_text}</p>
+                        <td className="py-4 px-3 max-w-[320px]">
+                          <p className="text-[#F4F7F2] font-sans font-medium text-sm truncate" title={gap.circular_title}>{gap.circular_title}</p>
+                          <p className="text-[10px] text-[#A7ADA7]/80 font-sans line-clamp-2 mt-1" title={gap.clause_text}>{gap.clause_text}</p>
                         </td>
-                        <td className="py-4 text-center font-bold text-cyber-cyan">{gap.page_number}</td>
-                        <td className="py-4 text-slate-300 font-medium">
+                        <td className="py-4 px-3 text-center font-bold text-[#B8FF00]">{gap.page_number}</td>
+                        <td className="py-4 px-3 text-[#A7ADA7] font-medium tracking-wide">
                           {gap.top_policy_title || 'N/A'}
                           {gap.matched_policy_line_num && (
-                            <div className="text-[10px] text-cyber-cyan mt-1">Line: {gap.matched_policy_line_num}</div>
+                            <div className="text-[9px] text-[#B8FF00] mt-1 tracking-widest uppercase">Line: {gap.matched_policy_line_num}</div>
                           )}
                         </td>
-                        <td className="py-4 text-cyber-blue font-bold">
+                        <td className="py-4 px-3 text-[#B8FF00] font-bold tracking-widest uppercase">
                           {gap.department_id?.replace("DEPT-", "")}
                           {gap.is_ambiguous && (
-                            <span className="block text-[8px] text-purple-400 font-bold uppercase mt-0.5">Ambiguous</span>
+                            <span className="block text-[8px] text-purple-400 font-bold uppercase mt-1 tracking-widest">Ambiguous</span>
                           )}
                         </td>
-                        <td className="py-4">
-                          <div className="text-slate-300 font-semibold">{gap.assigned_employee || 'Unassigned'}</div>
+                        <td className="py-4 px-3">
+                          <div className="text-[#A7ADA7] font-bold tracking-wider">{gap.assigned_employee || 'UNASSIGNED'}</div>
                           {gap.due_date && (
-                            <div className="text-[9px] text-slate-500">Due: {new Date(gap.due_date).toLocaleDateString()}</div>
+                            <div className="text-[9px] text-[#A7ADA7]/60 mt-1 uppercase tracking-widest">Due: {new Date(gap.due_date).toLocaleDateString()}</div>
                           )}
                         </td>
-                        <td className="py-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                        <td className="py-4 px-3">
+                          <span className={`px-2 py-1 rounded-sm text-[9px] font-bold uppercase tracking-wider ${
                             gap.triage_status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                             gap.triage_status === 'superseded' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                            gap.triage_status === 'cancelled' ? 'bg-slate-700/20 text-slate-500' :
+                            gap.triage_status === 'cancelled' ? 'bg-white/5 text-[#A7ADA7] border border-white/10' :
                             'bg-red-500/10 text-red-400 border border-red-500/20'
                           }`}>
-                            {gap.triage_status.toUpperCase()}
+                            {gap.triage_status}
                           </span>
                         </td>
-                        <td className="py-4 text-right pr-2">
+                        <td className="py-4 px-4 text-right">
                           <div className="flex gap-2 justify-end">
                             {(gap.triage_status === 'assigned' || gap.triage_status === 'open') && (
                               <>
                                 <button 
+
                                   onClick={(e) => { e.stopPropagation(); setReassigningGapId(gap.gap_id); }}
-                                  className="px-2 py-1 bg-cyber-blue/10 hover:bg-cyber-blue text-cyber-blue hover:text-white border border-cyber-blue/30 rounded text-[10px] font-bold transition-all"
+                                  className="px-3 py-1.5 bg-[#B8FF00]/10 hover:bg-[#B8FF00]/20 text-[#B8FF00] border border-[#B8FF00]/30 rounded text-[9px] font-bold tracking-widest uppercase transition-colors"
                                 >
                                   Assign
                                 </button>
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); handleCancelGap(gap.gap_id); }}
                                   disabled={actionLoading === gap.gap_id}
-                                  className="px-2 py-1 bg-red-950/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/25 rounded text-[10px] font-bold transition-all"
+                                  className="px-3 py-1.5 bg-red-950/20 hover:bg-red-900/40 text-red-400 border border-red-500/30 rounded text-[9px] font-bold tracking-widest uppercase transition-colors"
                                 >
                                   Cancel
                                 </button>
@@ -970,11 +1024,11 @@ export function AdminDashboard() {
                             )}
                           </div>
                           {reassigningGapId === gap.gap_id && (
-                            <div className="mt-2 flex gap-1 justify-end items-center">
+                            <div className="mt-2 flex gap-2 justify-end items-center">
                               <select
                                 value={selectedNewEmpId}
                                 onChange={(e) => setSelectedNewEmpId(e.target.value)}
-                                className="bg-obsidian-950 border border-cyber-cyan/30 text-slate-300 text-[10px] px-1 py-0.5 rounded outline-none"
+                                className="bg-[#0B0D0C] border border-[#B8FF00]/30 text-[#F4F7F2] text-[10px] px-2 py-1.5 rounded outline-none uppercase tracking-wide"
                               >
                                 <option value="">Select Employee</option>
                                 {(employeesByDept[gap.department_id] || []).map(emp => (
@@ -983,7 +1037,7 @@ export function AdminDashboard() {
                               </select>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleReassign(gap.gap_id); }}
-                                className="p-1 bg-cyber-cyan text-obsidian-950 rounded hover:scale-105 transition-transform"
+                                className="p-1.5 bg-[#B8FF00] text-[#0B0D0C] rounded hover:bg-[#CCFF00] transition-colors"
                               >
                                 <Check className="w-3.5 h-3.5" />
                               </button>
@@ -996,7 +1050,7 @@ export function AdminDashboard() {
                 </table>
               </div>
             )}
-          </GlassCard>
+          </div>
         </div>
       )}
 
