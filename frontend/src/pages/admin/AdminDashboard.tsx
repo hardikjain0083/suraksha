@@ -21,19 +21,21 @@ import {
   FileSpreadsheet,
   Layers2,
   AlertOctagon,
-  Tag
+  Tag,
+  BookOpen
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { GlassCard } from '@/components/ui/glass-card';
 import { GapDetailModal } from '../../components/gaps/GapDetailModal';
 
 export function AdminDashboard() {
-  // Tabs: 'gaps' | 'upload' | 'approvals' | 'policies' | 'orphans' | 'audit'
-  const [activeTab, setActiveTab] = useState<'gaps' | 'upload' | 'approvals' | 'policies' | 'orphans' | 'audit'>('gaps');
+  // Tabs: 'gaps' | 'upload' | 'circulars' | 'approvals' | 'policies' | 'orphans' | 'audit'
+  const [activeTab, setActiveTab] = useState<'gaps' | 'upload' | 'circulars' | 'approvals' | 'policies' | 'orphans' | 'audit'>('gaps');
   
   // Data states
   const [gaps, setGaps] = useState<any[]>([]);
   const [policies, setPolicies] = useState<any[]>([]);
+  const [circularsList, setCircularsList] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [employeesByDept, setEmployeesByDept] = useState<Record<string, any[]>>({});
   const [orphanedDirectives, setOrphanedDirectives] = useState<any[]>([]);
@@ -110,6 +112,33 @@ export function AdminDashboard() {
     }
   };
 
+  const fetchCircularsList = async () => {
+    try {
+      const res = await apiClient.get('/api/circulars');
+      if (res.data && res.data.circulars) {
+        setCircularsList(res.data.circulars);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteCircular = async (circularId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this circular? This will also remove any orphaned directives and log the deletion in the audit ledger.')) return;
+    setActionLoading(circularId);
+    try {
+      await apiClient.delete(`/api/circulars/${circularId}`);
+      triggerToast('Circular successfully deleted.');
+      fetchCircularsList();
+      fetchGaps();
+      fetchAuditLogs();
+    } catch (err: any) {
+      triggerToast(err.response?.data?.detail || 'Delete circular failed', true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const fetchNotifications = async () => {
     try {
       const res = await apiClient.get('/api/gaps/notifications');
@@ -183,6 +212,7 @@ export function AdminDashboard() {
   useEffect(() => {
     fetchGaps();
     fetchPolicies();
+    fetchCircularsList();
     fetchNotifications();
     seedEmployeeList();
     fetchOrphans();
@@ -221,6 +251,7 @@ export function AdminDashboard() {
         fetchGaps();
         fetchNotifications();
         fetchOrphans();
+        fetchCircularsList();
       }
     } catch (err: any) {
       triggerToast(err.response?.data?.detail || 'Circular upload failed', true);
@@ -562,11 +593,12 @@ export function AdminDashboard() {
 
       {/* Navigation Tabs */}
       <div className="flex border-b border-cyber-cyan/10">
-        {(['gaps', 'upload', 'approvals', 'policies', 'orphans', 'audit'] as const).map(tab => {
+        {(['gaps', 'upload', 'circulars', 'approvals', 'policies', 'orphans', 'audit'] as const).map(tab => {
           const active = activeTab === tab;
           const labels = {
             gaps: 'Remediation Queue',
             upload: 'Ingest Center',
+            circulars: 'Circulars Repo',
             approvals: `Pending Updates (${resolvedGapsPendingApproval})`,
             policies: 'Core Policy Repository',
             orphans: `Orphaned Directives (${orphanedDirectives.length})`,
@@ -1121,6 +1153,66 @@ export function AdminDashboard() {
             </form>
           </GlassCard>
         </div>
+      )}
+
+      {/* CIRCULARS LIST */}
+      {activeTab === 'circulars' && (
+        <GlassCard className="p-6 border-cyber-cyan/10">
+          <h2 className="text-sm font-bold font-mono text-cyber-cyan uppercase mb-4 flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-cyber-cyan" />
+            Circulars Repository
+          </h2>
+          {circularsList.length === 0 ? (
+            <div className="text-center py-16 text-slate-500 font-mono text-xs">No circulars uploaded yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse font-mono text-xs">
+                <thead>
+                  <tr className="border-b border-cyber-cyan/20 text-slate-400 text-[10px] uppercase">
+                    <th className="pb-3 pl-2">Circular ID</th>
+                    <th className="pb-3">Title / Number</th>
+                    <th className="pb-3">Issuer</th>
+                    <th className="pb-3">Date Issued</th>
+                    <th className="pb-3">Status</th>
+                    <th className="pb-3 text-right pr-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-cyber-cyan/5">
+                  {circularsList.map((circ) => (
+                    <tr key={circ.circular_id} className="hover:bg-white/5 transition-colors">
+                      <td className="py-4 pl-2 font-bold text-cyber-magenta">{circ.circular_id}</td>
+                      <td className="py-4">
+                        <p className="text-slate-200 font-semibold">{circ.title}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{circ.circular_number}</p>
+                      </td>
+                      <td className="py-4 font-bold text-cyber-cyan">{circ.issuer}</td>
+                      <td className="py-4 text-slate-300">
+                        {circ.date_issued ? new Date(circ.date_issued).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="py-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                          circ.ingestion_status === 'fully_parsed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        }`}>
+                          {circ.ingestion_status?.toUpperCase() || 'UNKNOWN'}
+                        </span>
+                      </td>
+                      <td className="py-4 text-right pr-2">
+                        <button
+                          onClick={() => handleDeleteCircular(circ.circular_id)}
+                          disabled={actionLoading === circ.circular_id}
+                          className="px-2 py-1 bg-red-950/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/25 rounded text-[10px] font-bold transition-all flex items-center gap-1 ml-auto"
+                        >
+                          {actionLoading === circ.circular_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </GlassCard>
       )}
 
       {/* CORE POLICY APPROVALS */}
