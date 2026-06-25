@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Lock, User, ArrowRight, AlertCircle, Cpu, Radio, Terminal as TerminalIcon } from 'lucide-react';
+import { Lock, User, AlertCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBehavioralCapture } from '../../hooks/useBehavioralCapture';
 import { BehavioralCaptureIndicator } from '../../components/auth/BehavioralCaptureIndicator';
 import { SessionHealthBadge } from '../../components/auth/SessionHealthBadge';
-import { GlassCard } from '@/components/ui/glass-card';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -101,56 +101,37 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-obsidian-950 font-mono text-slate-300 relative select-none">
-      {/* Dynamic Grid Background overlays */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293708_1px,transparent_1px),linear-gradient(to_bottom,#1f293708_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,217,255,0.025)_0%,transparent_65%)] pointer-events-none" />
+    <div className="lp-root">
+      {/* Atmospheric neon glow overlay */}
+      <div className="lp-glow-overlay" />
 
-      {/* ── Left Brand Cyber Panel ───────────────────────────── */}
-      <div className="hidden lg:flex w-1/2 bg-obsidian-900 border-r border-cyber-cyan/10 flex-col justify-center items-center p-12 text-white relative overflow-hidden">
-        {/* Cybersecurity background matrix simulation */}
-        <div className="absolute inset-0 opacity-15 pointer-events-none"
-          style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"80\" height=\"80\" viewBox=\"0 0 80 80\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cpath d=\"M0 0h40v40H0V0zm40 40h40v40H40V40z\" fill=\"%2300f2fe\" fill-opacity=\".04\" fill-rule=\"evenodd\"/%3E%3C/svg%3E')" }}
-        />
-        
+      {/* ── Left Hero Column ──────────────────────────────────── */}
+      <div className="lp-hero-col">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7 }}
-          className="z-10 text-center max-w-md relative"
+          initial={{ opacity: 0, x: -30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+          className="lp-hero-content"
         >
-          <div className="absolute -top-16 -left-16 w-32 h-32 bg-cyber-cyan/5 rounded-full blur-3xl pointer-events-none" />
-          <Shield className="w-20 h-20 mx-auto mb-6 text-cyber-cyan drop-shadow-glow animate-pulse-glow" />
-          <h1 className="text-4xl font-bold mb-2 tracking-widest text-cyber-cyan">SURAKSHA</h1>
-          <p className="text-sm font-semibold tracking-widest text-cyber-blue mb-6">// COMPLIANCE COGNITIVE SHIELD v4.0</p>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-            Zero-Trust identity verification pipeline enforcing automated biometric keystroke analysis, semantic audit tracing, and deterministic ledger mapping.
-          </p>
-          
-          <div className="mt-8 flex gap-2 justify-center flex-wrap">
-            {['BIOMETRIC TELEMETRY', 'COGNITIVE PARSING', 'SHA-256 LEDGER'].map((tag) => (
-              <span
-                key={tag}
-                className="px-3 py-1 bg-obsidian-950/80 rounded border border-cyber-cyan/25 text-[9px] font-bold text-cyber-cyan shadow-glow-cyan/5"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+          <h1 className="lp-hero-heading">
+            ESTABLISH<br />SESSION
+          </h1>
+          <p className="lp-hero-tagline">// SuRaksha Identity Verification Protocol v4.0</p>
         </motion.div>
       </div>
 
-      {/* ── Right Login Form Console ──────────────────────────── */}
-      <div className="flex w-full lg:w-1/2 flex-col justify-center items-center p-8 lg:p-16">
-        <div className="w-full max-w-md">
-          {/* Header block */}
-          <div className="flex justify-between items-center mb-6">
+      {/* ── Right Auth Card Column ────────────────────────────── */}
+      <div className="lp-card-col">
+        <motion.div
+          animate={shake ? { x: [-8, 8, -8, 8, 0] } : {}}
+          transition={{ duration: 0.4 }}
+          className="lp-card"
+        >
+          {/* Card Header */}
+          <div className="lp-card-header">
             <div>
-              <h2 className="text-xl font-bold tracking-wider text-cyber-cyan flex items-center gap-1.5 uppercase">
-                <Cpu className="w-4.5 h-4.5 text-cyber-cyan" />
-                Establish Session
-              </h2>
-              <p className="text-slate-500 text-[10px] uppercase font-bold mt-1 tracking-wider">SuRaksha Identity Port v4.0</p>
+              <h2 className="lp-card-title">ESTABLISH SESSION</h2>
+              <p className="lp-card-subtitle">SURAKSHA IDENTITY PORT V4.0</p>
             </div>
             <AnimatePresence>
               {sessionHealth && (
@@ -165,111 +146,376 @@ export const LoginPage = () => {
             </AnimatePresence>
           </div>
 
-          <motion.div
-            animate={shake ? { x: [-8, 8, -8, 8, 0] } : {}}
-            transition={{ duration: 0.4 }}
-          >
-            <GlassCard className="p-6 border-cyber-cyan/15">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="p-3 bg-red-950/20 border border-red-500/30 text-red-400 text-[10px] font-bold rounded-lg flex items-center gap-2"
-                    >
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      {error.toUpperCase()}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Employee ID */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 text-cyber-cyan" /> Operator ID
-                  </label>
-                  <input
-                    type="text"
-                    value={empId}
-                    onChange={(e) => setEmpId(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    onKeyUp={handleKeyUp}
-                    onMouseMove={captureMouse}
-                    className="w-full p-3 bg-obsidian-950/80 border border-cyber-cyan/20 focus:border-cyber-cyan text-slate-200 rounded-lg outline-none font-mono text-xs focus:shadow-glow-cyan transition-all"
-                    placeholder="EMP-COMP-001"
-                    required
-                    autoComplete="username"
-                  />
-                </div>
-
-                {/* Password */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                    <Lock className="w-3.5 h-3.5 text-cyber-cyan" /> Secure Keyphrase
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    onKeyUp={handleKeyUp}
-                    className="w-full p-3 bg-obsidian-950/80 border border-cyber-cyan/20 focus:border-cyber-cyan text-slate-200 rounded-lg outline-none font-mono text-xs focus:shadow-glow-cyan transition-all"
-                    placeholder="••••••••"
-                    required
-                    autoComplete="current-password"
-                  />
-                  <BehavioralCaptureIndicator isCapturing={isCapturing} />
-                </div>
-
-                {/* Auxiliary options */}
-                <div className="flex items-center justify-between text-[10px] font-bold">
-                  <Link to="/auth/enroll" className="text-cyber-cyan hover:underline hover:text-glow-cyan">
-                    Use Hardware Token
-                  </Link>
-                  <Link to="/auth/register" className="text-slate-500 hover:text-slate-300">
-                    New operator? Register
-                  </Link>
-                </div>
-
-                {/* Form submit button */}
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-3 bg-gradient-to-r from-cyber-cyan to-cyber-blue text-obsidian-950 rounded-lg font-bold hover:shadow-glow-cyan transition-all flex justify-center items-center gap-2 disabled:opacity-60 text-xs"
+          {/* Auth Form */}
+          <form onSubmit={handleSubmit} className="lp-form">
+            {/* Error message */}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="lp-error"
                 >
-                  {isLoading ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-obsidian-950" />
-                      COMPILING ACCESS TOKENS...
-                    </span>
-                  ) : (
-                    <>
-                      EXECUTE SECURE AUTH <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-            </GlassCard>
-          </motion.div>
+                  <AlertCircle className="lp-error-icon" />
+                  {error.toUpperCase()}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {/* Typewriter Demo credentials terminal pane */}
-          <div className="mt-5 p-3.5 bg-obsidian-950 border border-cyber-cyan/10 rounded-lg text-[10px] text-slate-400 font-mono">
-            <span className="text-cyber-blue font-bold flex items-center gap-1.5 mb-1 uppercase">
-              <TerminalIcon className="w-3.5 h-3.5 text-cyber-blue animate-pulse" />
-              DEMO CREDENTIALS LEDGER
-            </span>
-            <div className="space-y-0.5">
-              <div>COMPLIANCE ADMIN: <span className="text-cyber-cyan font-bold">EMP-COMP-001 / Demo@123</span></div>
-              <div>STAFF OPERATOR: <span className="text-cyber-cyan font-bold">EMP-045 / Demo@123</span></div>
-              <div>INDEPENDENT AUDITOR: <span className="text-cyber-cyan font-bold">AUD-007 / Demo@123</span></div>
+            {/* Employee ID */}
+            <div className="lp-field">
+              <label className="lp-label">
+                <User className="lp-label-icon" />
+                OPERATOR ID
+              </label>
+              <input
+                type="text"
+                value={empId}
+                onChange={(e) => setEmpId(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onKeyUp={handleKeyUp}
+                onMouseMove={captureMouse}
+                className="lp-input"
+                placeholder="EMP-COMP-001"
+                required
+                autoComplete="username"
+              />
             </div>
-          </div>
-        </div>
+
+            {/* Password */}
+            <div className="lp-field">
+              <label className="lp-label">
+                <Lock className="lp-label-icon" />
+                SECURE KEYPHRASE
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onKeyUp={handleKeyUp}
+                className="lp-input"
+                placeholder="••••••••"
+                required
+                autoComplete="current-password"
+              />
+              <BehavioralCaptureIndicator isCapturing={isCapturing} />
+            </div>
+
+            {/* Helper links */}
+            <div className="lp-links">
+              <Link to="/auth/enroll" className="lp-link">
+                Use Hardware Token
+              </Link>
+              <Link to="/auth/register" className="lp-link">
+                New operator? Register
+              </Link>
+            </div>
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`lp-btn${isLoading ? ' lp-btn--loading' : ''}`}
+            >
+              {isLoading ? (
+                <span className="lp-btn-inner">
+                  <Loader2 className="lp-spinner" />
+                  COMPILING ACCESS TOKENS...
+                </span>
+              ) : (
+                <>EXECUTE SECURE AUTH &nbsp;→</>
+              )}
+            </button>
+          </form>
+        </motion.div>
       </div>
+
+      <style>{`
+        /* ── Google Fonts ─────────────────────────────────────── */
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400&display=swap');
+
+        /* ── Root Layout ──────────────────────────────────────── */
+        .lp-root {
+          display: grid;
+          grid-template-columns: 55% 45%;
+          min-height: 100vh;
+          width: 100%;
+          background-color: #080808;
+          position: relative;
+          overflow: hidden;
+          font-family: 'Space Grotesk', system-ui, sans-serif;
+        }
+
+        /* ── Atmospheric neon glow ────────────────────────────── */
+        .lp-glow-overlay {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+            ellipse 60% 60% at 15% 50%,
+            rgba(170, 255, 0, 0.12) 0%,
+            rgba(170, 255, 0, 0.03) 40%,
+            transparent 70%
+          );
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        /* ── Hero Left Column ─────────────────────────────────── */
+        .lp-hero-col {
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          padding: 4rem 3rem 4rem 5rem;
+          position: relative;
+          z-index: 1;
+        }
+
+        .lp-hero-content {
+          max-width: 520px;
+        }
+
+        .lp-hero-heading {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: clamp(2.5rem, 5vw, 4.5rem);
+          font-weight: 700;
+          letter-spacing: -2px;
+          color: #FFFFFF;
+          text-transform: uppercase;
+          line-height: 0.95;
+          margin: 0 0 1.5rem 0;
+        }
+
+        .lp-hero-tagline {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11px;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          color: #AAFF00;
+          margin: 0;
+        }
+
+        /* ── Auth Card Right Column ───────────────────────────── */
+        .lp-card-col {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem 3rem 2rem 1.5rem;
+          position: relative;
+          z-index: 1;
+        }
+
+        .lp-card {
+          background: rgba(13, 17, 23, 0.85);
+          border: 1px solid rgba(170, 255, 0, 0.18);
+          border-radius: 16px;
+          padding: 2.5rem;
+          backdrop-filter: blur(12px) saturate(1.2);
+          max-width: 420px;
+          width: 100%;
+          position: relative;
+        }
+
+        /* ── Card Header ──────────────────────────────────────── */
+        .lp-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 1.75rem;
+        }
+
+        .lp-card-title {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 18px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          color: #FFFFFF;
+          text-transform: uppercase;
+          margin: 0 0 0.35rem 0;
+        }
+
+        .lp-card-subtitle {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          color: #AAFF00;
+          margin: 0;
+        }
+
+        /* ── Form ─────────────────────────────────────────────── */
+        .lp-form {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+        }
+
+        /* ── Error ────────────────────────────────────────────── */
+        .lp-error {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1rem;
+          background: rgba(255, 68, 68, 0.08);
+          border: 1px solid rgba(255, 68, 68, 0.3);
+          border-radius: 8px;
+          color: #FF4444;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+        }
+
+        .lp-error-icon {
+          width: 16px;
+          height: 16px;
+          flex-shrink: 0;
+        }
+
+        /* ── Fields ───────────────────────────────────────────── */
+        .lp-field {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .lp-label {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 3px;
+          color: #A0A0A0;
+          text-transform: uppercase;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .lp-label-icon {
+          width: 14px;
+          height: 14px;
+          color: #AAFF00;
+        }
+
+        .lp-input {
+          background: #111318;
+          border: 1px solid rgba(170, 255, 0, 0.15);
+          border-radius: 8px;
+          color: #FFFFFF;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 14px;
+          padding: 12px 16px;
+          width: 100%;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
+        }
+
+        .lp-input::placeholder {
+          color: #4A4A4A;
+        }
+
+        .lp-input:focus {
+          border-color: rgba(170, 255, 0, 0.6);
+          box-shadow: 0 0 0 3px rgba(170, 255, 0, 0.08);
+        }
+
+        /* ── Helper Links ─────────────────────────────────────── */
+        .lp-links {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .lp-link {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11px;
+          color: rgba(170, 255, 0, 0.6);
+          text-decoration: none;
+          letter-spacing: 0.5px;
+          transition: color 0.2s;
+        }
+
+        .lp-link:hover {
+          color: #AAFF00;
+        }
+
+        /* ── CTA Button ───────────────────────────────────────── */
+        .lp-btn {
+          background: #AAFF00;
+          color: #080808;
+          border: none;
+          border-radius: 8px;
+          width: 100%;
+          padding: 14px 24px;
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 2.5px;
+          text-transform: uppercase;
+          cursor: pointer;
+          position: relative;
+          overflow: hidden;
+          transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .lp-btn:hover:not(.lp-btn--loading) {
+          background: #CCFF00;
+          box-shadow: 0 0 24px rgba(170, 255, 0, 0.4);
+          transform: translateY(-1px);
+        }
+
+        .lp-btn:active:not(.lp-btn--loading) {
+          transform: translateY(0px);
+          box-shadow: 0 0 12px rgba(170, 255, 0, 0.25);
+        }
+
+        .lp-btn--loading {
+          background: rgba(170, 255, 0, 0.3);
+          color: rgba(8, 8, 8, 0.5);
+          cursor: not-allowed;
+        }
+
+        .lp-btn-inner {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .lp-spinner {
+          width: 16px;
+          height: 16px;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        /* ── Mobile Responsive ────────────────────────────────── */
+        @media (max-width: 768px) {
+          .lp-root {
+            grid-template-columns: 1fr;
+          }
+
+          .lp-hero-col {
+            display: none;
+          }
+
+          .lp-card-col {
+            padding: 1.5rem;
+            min-height: 100vh;
+          }
+
+          .lp-card {
+            max-width: 100%;
+          }
+        }
+      `}</style>
     </div>
   );
 };
-
-import { Loader2 } from 'lucide-react';

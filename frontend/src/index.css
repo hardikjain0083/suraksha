@@ -1,6 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── SuRaksha v4.0 Blackbird Design System ─────────────── */
+:root {
+  --neon: #AAFF00;
+  --neon-bright: #CCFF00;
+  --neon-border: rgba(170, 255, 0, 0.15);
+  --neon-border-active: rgba(170, 255, 0, 0.6);
+  --neon-glow: rgba(170, 255, 0, 0.08);
+  --bg-page: #080808;
+  --bg-card: #0d1117;
+  --bg-input: #111318;
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0A0A0;
+  --text-tertiary: #4A4A4A;
+  --error: #FF4444;
+}
 
 @layer base {
   :root {

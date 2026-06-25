@@ -108,39 +108,90 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isAuthOrHome) {
     return (
-      <div className="flex flex-col h-screen bg-obsidian-900 overflow-y-auto relative font-sans text-foreground">
-        {/* Subtle matrix-grid aesthetic background */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293710_1px,transparent_1px),linear-gradient(to_bottom,#1f293710_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
-        
-        {/* Public Header */}
-        <header className="bg-obsidian-950/80 backdrop-blur-md text-cyber-cyan p-4 shadow-glow-cyan/10 flex justify-between items-center z-10 shrink-0 border-b border-cyber-cyan/10">
-          <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8 text-cyber-cyan animate-pulse-glow" />
-            <h1 className="text-xl font-bold font-mono tracking-wider text-cyber-cyan">
-              SuRaksha MAPS <span className="text-xs bg-obsidian-800 border border-cyber-blue/30 px-2 py-0.5 rounded ml-1 text-cyber-blue tracking-normal font-sans">v4.0</span>
-            </h1>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#080808', overflowY: 'auto', position: 'relative', fontFamily: "'Space Grotesk', system-ui, sans-serif", color: '#FFFFFF' }}>
+        {/* Public Header — Blackbird IT style */}
+        <header style={{
+          background: 'transparent',
+          borderBottom: '1px solid rgba(170, 255, 0, 0.1)',
+          padding: '0 2rem',
+          height: '64px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'relative',
+          zIndex: 10,
+          flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: '14px',
+              fontWeight: 700,
+              letterSpacing: '2px',
+              color: '#FFFFFF',
+              textTransform: 'uppercase',
+            }}>SuRaksha MAPS</span>
+            <span style={{
+              background: 'rgba(170, 255, 0, 0.1)',
+              color: '#AAFF00',
+              border: '1px solid rgba(170, 255, 0, 0.3)',
+              borderRadius: '4px',
+              fontSize: '10px',
+              padding: '2px 7px',
+              fontFamily: "'JetBrains Mono', monospace",
+              letterSpacing: '1px',
+            }}>v4.0</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Link to="/judge-guide" className="px-3 py-1 bg-gradient-to-r from-cyber-cyan to-cyber-blue text-obsidian-900 text-xs font-bold rounded shadow-glow-cyan hover:scale-105 transition-transform flex items-center gap-1">
-              <Activity className="w-3.5 h-3.5" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Link
+              to="/judge-guide"
+              style={{
+                background: 'transparent',
+                border: '1px solid #AAFF00',
+                color: '#AAFF00',
+                borderRadius: '999px',
+                padding: '6px 18px',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                textDecoration: 'none',
+                transition: 'background 0.2s, color 0.2s',
+                display: 'inline-block',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = '#AAFF00';
+                (e.currentTarget as HTMLElement).style.color = '#080808';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'transparent';
+                (e.currentTarget as HTMLElement).style.color = '#AAFF00';
+              }}
+            >
               JUDGE GUIDE
             </Link>
           </div>
         </header>
 
         {/* Content Wrapper */}
-        <main className="flex-1 flex flex-col relative z-10 w-full">
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1, width: '100%' }}>
           {children}
         </main>
 
         {/* Public Footer */}
-        <footer className="bg-obsidian-950/90 text-muted-foreground py-6 text-center text-xs font-mono border-t border-cyber-cyan/10 mt-auto z-10">
-          <p className="text-cyber-cyan/50">{t('SuRaksha Compliance Intelligence Platform ')} &copy; 2026</p>
-          <p className="mt-1 opacity-50 flex justify-center gap-4 text-[10px]">
-            <span className="text-cyber-blue">{t('AI-POWERED COGNITIVE DECOMPOSITION')}</span>
-            <span>•</span>
-            <span className="text-cyber-green">{t('SECURE HASH VERIFICATION')}</span>
-          </p>
+        <footer style={{
+          background: 'transparent',
+          borderTop: '1px solid rgba(170, 255, 0, 0.08)',
+          padding: '1.5rem',
+          textAlign: 'center',
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '10px',
+          color: 'rgba(170, 255, 0, 0.3)',
+          letterSpacing: '1px',
+          zIndex: 10,
+        }}>
+          <p>SuRaksha Compliance Intelligence Platform &copy; 2026</p>
         </footer>
       </div>
     );
