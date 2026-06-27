@@ -562,7 +562,7 @@ async def resolve_orphaned_directive(
 
 @router.post("/bulk-assign")
 async def bulk_assign_gaps(
-    gap_ids: List[str],
+    gap_ids: List[str] = Form(...),
     hod_id: str = Form(...),
     employee_id: str = Form(None),
     current_user: dict = Depends(get_current_user)
@@ -611,7 +611,7 @@ async def bulk_assign_gaps(
 
 @router.post("/bulk-severity")
 async def bulk_severity_gaps(
-    gap_ids: List[str],
+    gap_ids: List[str] = Form(...),
     severity: str = Form(...),
     current_user: dict = Depends(get_current_user)
 ):

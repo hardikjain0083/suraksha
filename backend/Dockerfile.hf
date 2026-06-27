@@ -27,6 +27,7 @@ WORKDIR /app
 COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "import nltk; nltk.download('wordnet'); nltk.download('omw-1.4')"
+RUN python -m spacy download en_core_web_sm
 
 # ── Copy application ───────────────────────────────────────────
 COPY --chown=user . .

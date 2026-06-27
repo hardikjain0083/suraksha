@@ -190,19 +190,17 @@ export function AdminDashboard() {
   // Seed list of employees per department for reassign dropdown
   const seedEmployeeList = async () => {
     try {
-      const depts = [
-        "DEPT-COMPLIANCE", "DEPT-LEGAL", "DEPT-RISK", "DEPT-OPS", 
-        "DEPT-IT-CYBER", "DEPT-HR", "DEPT-FINANCE", "DEPT-CREDIT"
-      ];
+      const res = await apiClient.get('/api/admin/users');
+      const users = res.data || [];
       const mapping: Record<string, any[]> = {};
-      for (const dId of depts) {
-        const cleanCode = dId.replace("DEPT-", "");
-        mapping[dId] = [
-          { emp_id: `EMP-${cleanCode}-001`, name: `${cleanCode} Officer A` },
-          { emp_id: `EMP-${cleanCode}-002`, name: `${cleanCode} Officer B` },
-          { emp_id: `EMP-${cleanCode}-HEAD`, name: `${cleanCode} Head` }
-        ];
-      }
+      
+      users.forEach((u: any) => {
+        if (!mapping[u.dept]) {
+          mapping[u.dept] = [];
+        }
+        mapping[u.dept].push(u);
+      });
+      
       setEmployeesByDept(mapping);
     } catch (err) {
       console.error(err);

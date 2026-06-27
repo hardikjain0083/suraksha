@@ -76,3 +76,4 @@ async def health_check():
         "database": db_status,
         "demo_mode": settings.demo_mode,
     }
+

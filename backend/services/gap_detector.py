@@ -92,7 +92,7 @@ def route_department(circular_number: str, text: str, category_tag: str = "") ->
         
     name_to_id = {
         "Compliance": "DEPT-COMPLIANCE", "IT Security": "DEPT-IT-CYBER", "Risk Management": "DEPT-RISK",
-        "Finance": "DEPT-FINANCE", "Operations": "DEPT-OPS", "Credit": "DEPT-SME-CREDIT", "HR": "DEPT-HR"
+        "Finance": "DEPT-FINANCE", "Operations": "DEPT-OPS", "Credit": "DEPT-CREDIT", "HR": "DEPT-HR"
     }
     
     text_lower = text.lower()
@@ -125,7 +125,7 @@ def route_department(circular_number: str, text: str, category_tag: str = "") ->
 async def get_available_employee(db: Any, department_id: str) -> Optional[str]:
     employees_cursor = db.users.find({
         "department_id": department_id,
-        "role": "employee",
+        "role": {"$in": ["employee", "compliance_officer"]},
         "status": "active"
     })
     employees = await employees_cursor.to_list(length=100)
@@ -134,7 +134,8 @@ async def get_available_employee(db: Any, department_id: str) -> Optional[str]:
 
     available = [e for e in employees if e.get("availability_status", "available") == "available" and e.get("active_gap_count", 0) < e.get("max_concurrent_gaps", 5)]
     if not available:
-        return None
+        employees.sort(key=lambda e: (e.get("active_gap_count", 0), e.get("last_assigned_date") or datetime.min))
+        return employees[0]["emp_id"]
         
     available.sort(key=lambda e: (e.get("active_gap_count", 0), e.get("last_assigned_date") or datetime.min))
     return available[0]["emp_id"]
@@ -230,7 +231,11 @@ async def detect_gaps_for_circular(circular_id: str, db: Any) -> GapDetectionRes
                         best_policy = policy
                         best_clause_text = pc_text
                         best_clause_page = pc.get("page_number", 1)
-                        best_line_num = None
+                        best_line_num = 1
+                        if policy_text and pc_text:
+                            idx = policy_text.find(pc_text)
+                            if idx != -1:
+                                best_line_num = policy_text.count('\n', 0, idx) + 1
                         best_signals = signals
                         best_policy_frame = pol_frame
                         
