@@ -99,15 +99,15 @@ DIRECTIVE_KEYWORDS = {
     "shall appoint", "shall participate", "shall ensure"
 }
 
-MATCH_THRESHOLD = 0.75
+MATCH_THRESHOLD = 0.60
 PARTIAL_THRESHOLD = 0.30
 
 SIGNAL_WEIGHTS = {
-    "tfidf": 0.30,
-    "jaccard": 0.20,
-    "fuzzy": 0.15,
-    "embedding": 0.00,
-    "frame": 0.35
+    "tfidf": 0.20,
+    "jaccard": 0.10,
+    "fuzzy": 0.10,
+    "embedding": 0.30,
+    "frame": 0.30
 }
 
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"

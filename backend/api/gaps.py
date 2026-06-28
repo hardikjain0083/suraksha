@@ -207,12 +207,18 @@ async def cancel_gap(
     
     return {"status": "success", "message": "Gap cancelled successfully"}
 
+from pydantic import BaseModel
+
+class ReassignRequest(BaseModel):
+    new_employee_id: str
+
 @router.patch("/{gap_id}/reassign")
 async def reassign_gap(
     gap_id: str,
-    new_employee_id: str = Form(...),
+    body: ReassignRequest,
     current_user: dict = Depends(get_current_user)
 ):
+    new_employee_id = body.new_employee_id
     database = get_db()
     gap = await database.gap_queue.find_one({"gap_id": gap_id})
     if not gap:
@@ -224,10 +230,15 @@ async def reassign_gap(
     ):
         raise HTTPException(status_code=403, detail="Action unauthorized")
         
-    # Verify new employee exists and is in the same department
+    # Verify new employee exists
     new_emp = await database.users.find_one({"emp_id": new_employee_id})
-    if not new_emp or new_emp.get("department_id") != gap.get("department_id"):
-        raise HTTPException(status_code=400, detail="New employee must exist and belong to the same department")
+    if not new_emp:
+        raise HTTPException(status_code=400, detail="New employee does not exist")
+        
+    # Check department match
+    if new_emp.get("department_id") != gap.get("department_id"):
+        if current_user.get("role") not in ("super_admin", "admin"):
+            raise HTTPException(status_code=400, detail="Only admins can reassign gaps across different departments")
 
     # Availability & Workload checks
     if new_emp.get("availability_status", "available") != "available":
@@ -249,7 +260,11 @@ async def reassign_gap(
     
     await database.gap_queue.update_one(
         {"gap_id": gap_id},
-        {"$set": {"assigned_employee": new_employee_id, "triage_status": "assigned"}}
+        {"$set": {
+            "assigned_employee": new_employee_id, 
+            "department_id": new_emp.get("department_id"),
+            "triage_status": "assigned"
+        }}
     )
     
     # Notify old employee

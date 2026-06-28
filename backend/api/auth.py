@@ -105,8 +105,11 @@ async def register_user(user_data: UserRegister):
         "department_id": dept_id,
         "designation": user_data.designation,
         "hashed_password": get_password_hash(user_data.password),
-        "role": "compliance_officer",
+        "role": "employee",
         "status": "active",
+        "availability_status": "available",
+        "active_gap_count": 0,
+        "max_concurrent_gaps": 5,
         "behavioral_baseline": {
             "status": "pending",
             "rounds_completed": 0,
@@ -115,7 +118,7 @@ async def register_user(user_data: UserRegister):
     }
 
     await database.users.insert_one(new_user)
-    access_token = create_access_token(data={"sub": emp_id, "role": "compliance_officer"})
+    access_token = create_access_token(data={"sub": emp_id, "role": "employee"})
 
     return {
         "emp_id": emp_id,
@@ -228,6 +231,17 @@ async def update_user_role(emp_id: str, body: dict):
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"status": "success", "message": "Role updated"}
+
+@admin_router.patch("/users/{emp_id}/department")
+async def update_user_department(emp_id: str, body: dict):
+    database = get_db()
+    department_id = body.get("department_id")
+    if not department_id:
+        raise HTTPException(status_code=400, detail="department_id is required")
+    res = await database.users.update_one({"emp_id": emp_id}, {"$set": {"department_id": department_id}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "success", "message": "Department updated"}
 
 @admin_router.post("/users/{emp_id}/reset-enrollment")
 async def reset_user_enrollment(emp_id: str):

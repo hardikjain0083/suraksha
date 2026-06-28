@@ -5,6 +5,7 @@ import { Shield, Search, Database, Loader2 } from 'lucide-react';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegistrationPage } from './pages/auth/RegistrationPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { UserManagement } from './pages/admin/UserManagement';
 import { DepartmentDashboard } from './pages/dept/DepartmentDashboard';
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 import { AppLayout } from './components/layout/AppLayout';
@@ -238,6 +239,9 @@ function App() {
           {/* Admin Dashboard */}
           <Route path="/admin" element={
             <AdminRoute><AdminDashboard /></AdminRoute>
+          } />
+          <Route path="/admin/users" element={
+            <AdminRoute><UserManagement /></AdminRoute>
           } />
 
           {/* Fallback */}

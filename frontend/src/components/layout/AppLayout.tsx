@@ -33,6 +33,7 @@ const adminNavGroups = [
     title: 'System Control',
     items: [
       { to: '/admin', icon: Shield, label: 'Admin Dashboard', exact: true },
+      { to: '/admin/users', icon: Users, label: 'User Management', exact: true },
     ]
   }
 ];

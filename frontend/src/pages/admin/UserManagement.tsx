@@ -34,6 +34,24 @@ const roleLabel: Record<string, string> = {
   employee:           'Employee',
 };
 
+const DEPARTMENTS = [
+  { id: 'DEPT-COMPLIANCE', name: 'Compliance' },
+  { id: 'DEPT-LEGAL', name: 'Legal' },
+  { id: 'DEPT-RISK', name: 'Risk' },
+  { id: 'DEPT-OPS', name: 'Operations' },
+  { id: 'DEPT-BRANCH-BANKING', name: 'Branch Banking' },
+  { id: 'DEPT-IT-CYBER', name: 'IT / Cybersecurity' },
+  { id: 'DEPT-FINANCE', name: 'Finance / Accounts' },
+  { id: 'DEPT-HR', name: 'HR' },
+  { id: 'DEPT-RECOVERY', name: 'Recovery / Collections' },
+  { id: 'DEPT-TREASURY', name: 'Treasury' },
+  { id: 'DEPT-SME-CREDIT', name: 'SME / Retail / Credit' },
+  { id: 'DEPT-SECURITY-VIGILANCE', name: 'Security / Vigilance' },
+  { id: 'DEPT-CUSTOMER-SERVICE', name: 'Customer Service' },
+  { id: 'DEPT-MIS', name: 'MIS / Reporting' },
+  { id: 'DEPT-AUDIT', name: 'Audit / Inspection' }
+];
+
 export function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +59,7 @@ export function UserManagement() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+  const [updatingDept, setUpdatingDept] = useState<string | null>(null);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -68,6 +87,20 @@ export function UserManagement() {
       showToast('❌ Failed to update role', false);
     } finally {
       setUpdatingRole(null);
+    }
+  };
+
+  const handleDepartmentChange = async (emp_id: string, newDept: string) => {
+    setUpdatingDept(emp_id);
+    try {
+      await apiClient.patch(`/api/admin/users/${emp_id}/department`, { department_id: newDept });
+      setUsers(prev => prev.map(u => u.emp_id === emp_id ? { ...u, dept: newDept } : u));
+      const deptName = DEPARTMENTS.find(d => d.id === newDept)?.name || newDept;
+      showToast(`✅ Department updated to ${deptName}`);
+    } catch {
+      showToast('❌ Failed to update department', false);
+    } finally {
+      setUpdatingDept(null);
     }
   };
 
@@ -185,7 +218,22 @@ export function UserManagement() {
                     <div className="text-xs text-slate-400 font-mono">{u.emp_id}</div>
                     <div className="text-xs text-slate-400">{u.email}</div>
                   </td>
-                  <td className="px-5 py-4 text-slate-600">{u.dept}</td>
+                  <td className="px-5 py-4 text-slate-600">
+                    <div className="relative inline-block">
+                      <select
+                        value={u.dept}
+                        disabled={updatingDept === u.emp_id}
+                        onChange={e => handleDepartmentChange(u.emp_id, e.target.value)}
+                        className={`appearance-none border rounded-lg px-3 py-1.5 pr-7 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-canara-blue/40 bg-slate-100 ${updatingDept === u.emp_id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        {DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                      <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    {updatingDept === u.emp_id && (
+                      <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-canara-blue" />
+                    )}
+                  </td>
                   <td className="px-5 py-4">
                     {/* Role change dropdown */}
                     <div className="relative inline-block">
