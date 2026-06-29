@@ -8,6 +8,7 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { UserManagement } from './pages/admin/UserManagement';
 import { DepartmentDashboard } from './pages/dept/DepartmentDashboard';
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
+import { JudgeGuidePage } from './pages/admin/JudgeGuidePage';
 import { AppLayout } from './components/layout/AppLayout';
 import { AdminRoute, EmployeeRoute } from './components/auth/RouteGuards';
 
@@ -221,6 +222,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/register" element={<RegistrationPage />} />
+          <Route path="/judge-guide" element={<JudgeGuidePage />} />
 
           {/* Employee Dashboard */}
           <Route path="/employee/dashboard" element={

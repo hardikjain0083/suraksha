@@ -95,7 +95,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isAuthOrHome =
-    location.pathname.startsWith('/auth') || location.pathname === '/';
+    location.pathname.startsWith('/auth') || location.pathname === '/' || location.pathname === '/judge-guide';
 
   const handleLogout = () => {
     setIsLoggingOut(true);

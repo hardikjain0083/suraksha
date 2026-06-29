@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, AlertTriangle, FileText, Calendar, User, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { X, AlertTriangle, FileText, Calendar, User, Loader2, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
 interface Props {
@@ -28,173 +28,229 @@ export const GapDetailModal: React.FC<Props> = ({ gap, onClose, onActionComplete
     }
   };
 
-  const getSeverityColor = (sev: string) => {
-    switch (sev?.toLowerCase()) {
-      case 'critical': return 'bg-red-100 text-red-700';
-      case 'high': return 'bg-orange-100 text-orange-700';
-      case 'medium': return 'bg-yellow-100 text-yellow-700';
-      case 'low': return 'bg-green-100 text-green-700';
-      default: return 'bg-slate-100 text-slate-700';
+  const getSeverityBadge = (sev: string) => {
+    const s = (sev || 'unknown').toLowerCase();
+    switch (s) {
+      case 'critical':
+        return 'border-[#FF5B5B]/30 text-[#FF5B5B] bg-[#FF5B5B]/10';
+      case 'high':
+        return 'border-[#FFB020]/30 text-[#FFB020] bg-[#FFB020]/10';
+      case 'medium':
+        return 'border-blue-500/30 text-blue-400 bg-blue-500/10';
+      case 'low':
+        return 'border-[#A8FF00]/30 text-[#A8FF00] bg-[#A8FF00]/10';
+      default:
+        return 'border-white/10 text-[#97A18D] bg-white/5';
     }
   };
 
   const similarityScores = gap.similarity_scores || {};
   const finalScore = (gap.similarity_score || 0) * 100;
 
+  // For the circular gauge svg
+  const radius = 34;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (finalScore / 100) * circumference;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
+        transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+        className="bg-[#0C100D] border border-[#A8FF00]/25 rounded-xl shadow-[0_0_50px_rgba(168,255,0,0.15)] w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col font-mono text-[#F5F7F3]"
         onClick={e => e.stopPropagation()}
       >
-        {/* Top Header Row (Mimics research top bar) */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${getSeverityColor(gap.severity)}`}>
+        {/* Custom scrollbar css injections */}
+        <style dangerouslySetInnerHTML={{__html: `
+          .custom-modal-scroll::-webkit-scrollbar { width: 6px; }
+          .custom-modal-scroll::-webkit-scrollbar-track { background: #0C100D; }
+          .custom-modal-scroll::-webkit-scrollbar-thumb { background: rgba(168, 255, 0, 0.2); border-radius: 3px; }
+          .custom-modal-scroll::-webkit-scrollbar-thumb:hover { background: rgba(168, 255, 0, 0.4); }
+        `}} />
+
+        {/* Top Header Row (Command center style) */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#A8FF00]/12 bg-[#111712]/50">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`px-2.5 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider ${getSeverityBadge(gap.severity)}`}>
               {gap.severity || 'Unknown'}
             </span>
-            <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
+            <span className="px-2.5 py-0.5 rounded border border-[#45D8FF]/30 text-[#45D8FF] bg-[#45D8FF]/10 text-[9px] font-bold uppercase tracking-wider">
               {(gap.gap_status || gap.gap_type || 'Unknown Gap').replace(/_/g, ' ')}
             </span>
-            <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold">
+            <span className="px-2.5 py-0.5 rounded border border-[#A8FF00]/30 text-[#A8FF00] bg-[#A8FF00]/5 text-[9px] font-bold uppercase tracking-wider">
               {gap.department_id?.replace('DEPT-', '') || 'Compliance'}
             </span>
             {gap.page_number && (
-              <span className="px-3 py-1 rounded-full bg-indigo-900 text-white text-xs font-semibold">
+              <span className="px-2.5 py-0.5 rounded border border-white/10 text-[#97A18D] bg-white/5 text-[9px] font-bold uppercase tracking-wider">
                 Page {gap.page_number}
               </span>
             )}
           </div>
-          <div className="text-right">
-            <div className="text-sm text-slate-500 font-mono">Gap ID: {gap.gap_id}</div>
-            <div className="text-md font-bold text-slate-800 mt-1">Score: {finalScore.toFixed(1)}%</div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-[10px] text-[#97A18D] font-mono">// GAP ID: {gap.gap_id}</div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-[#A8FF00]/10 text-[#97A18D] hover:text-[#A8FF00] rounded transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button onClick={onClose} className="p-2 ml-4 hover:bg-slate-100 rounded-lg transition-colors self-start">
-            <X className="w-5 h-5 text-slate-500" />
-          </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+        <div className="overflow-y-auto flex-1 p-6 space-y-6 custom-modal-scroll bg-[#0C100D]">
           {/* Side-by-side RBI vs Policy */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* RBI Guideline */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="text-blue-600 font-bold flex items-center gap-2">
-                  <span className="text-xl">⚖️</span> RBI Guideline
+            <div className="bg-[#111712] border border-[#A8FF00]/12 rounded-lg p-5 flex flex-col justify-between hover:border-[#A8FF00]/25 transition-all">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-4 h-4 text-[#45D8FF]" />
+                  <span className="text-xs font-bold text-[#45D8FF] uppercase tracking-wider">RBI Guideline Directive</span>
+                </div>
+                <div className="text-xs text-[#F5F7F3] leading-relaxed font-sans mb-4 whitespace-pre-wrap">
+                  {gap.clause_text}
                 </div>
               </div>
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 text-sm text-slate-700 leading-relaxed shadow-sm">
-                <p className="mb-4">{gap.clause_text}</p>
+              <div className="border-t border-[#A8FF00]/10 pt-3 mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-[#97A18D]">
                 {gap.circular_number && (
-                  <div className="text-xs text-slate-500">
-                    Circular: {gap.circular_number}
+                  <div>
+                    CIRCULAR: <span className="text-[#F5F7F3]">{gap.circular_number}</span>
                   </div>
                 )}
-              </div>
-              <div className="mt-3 text-xs text-slate-500 font-semibold">
-                Action: <span className="font-normal">{gap.rbi_action || 'N/A'}</span> | 
-                Modality: <span className="font-normal">{gap.rbi_modality || 'N/A'}</span>
+                <div>
+                  ACTION: <span className="text-[#F5F7F3]">{gap.rbi_action || 'N/A'}</span>
+                </div>
+                <div>
+                  MODALITY: <span className="text-[#F5F7F3]">{gap.rbi_modality || 'N/A'}</span>
+                </div>
               </div>
             </div>
 
             {/* Best Matching Policy Clause */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="text-green-600 font-bold flex items-center gap-2">
-                  <span className="text-xl">📄</span> Best Matching Policy Clause
+            <div className="bg-[#111712] border border-[#A8FF00]/12 rounded-lg p-5 flex flex-col justify-between hover:border-[#A8FF00]/25 transition-all">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="w-4 h-4 text-[#A8FF00]" />
+                  <span className="text-xs font-bold text-[#A8FF00] uppercase tracking-wider">Best Matching Policy Clause</span>
+                </div>
+                <div className="text-xs text-[#F5F7F3] leading-relaxed font-sans mb-4 whitespace-pre-wrap">
+                  {gap.fixed_policy_content || gap.top_policy_title || 'No matching clause found'}
                 </div>
               </div>
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 text-sm text-slate-700 leading-relaxed shadow-sm">
-                <p className="mb-4">{gap.fixed_policy_content || gap.top_policy_title || 'No matching clause found'}</p>
-                <div className="text-xs text-slate-500">
-                  Section: {gap.matched_policy_line_num || 'N/A'}
+              <div className="border-t border-[#A8FF00]/10 pt-3 mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-[#97A18D]">
+                <div>
+                  SECTION/LINE: <span className="text-[#F5F7F3]">{gap.matched_policy_line_num || 'N/A'}</span>
                 </div>
-              </div>
-              <div className="mt-3 text-xs text-slate-500 font-semibold">
-                Action: <span className="font-normal">{gap.policy_action || 'N/A'}</span> | 
-                Modality: <span className="font-normal">{gap.policy_modality || 'N/A'}</span>
+                <div>
+                  ACTION: <span className="text-[#F5F7F3]">{gap.policy_action || 'N/A'}</span>
+                </div>
+                <div>
+                  MODALITY: <span className="text-[#F5F7F3]">{gap.policy_modality || 'N/A'}</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Gap Description Box */}
-          <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-5">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-slate-800" /> Gap Description
+          {/* Gap Description Box - Dark with Orange Accent */}
+          <div className="bg-[#111712] border border-[#FFB020]/25 rounded-lg p-5 relative overflow-hidden group">
+            <div className="absolute top-0 left-0 w-1 h-full bg-[#FFB020]" />
+            <h3 className="font-bold text-[#FFB020] flex items-center gap-2 text-xs uppercase tracking-wider mb-2">
+              <AlertTriangle className="w-4 h-4 text-[#FFB020]" /> Mismatch Diagnostics &amp; Classifications
             </h3>
-            <p className="text-sm text-slate-700">
+            <p className="text-xs text-[#97A18D] font-sans leading-relaxed pl-1">
               {gap.mismatch_description || gap.classification_reason || 'Gap detected - manual review required.'}
             </p>
           </div>
 
-          {/* Similarity Signal Breakdown */}
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-5">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-              <FileText className="w-4 h-4 text-slate-800" /> Similarity Signal Breakdown
-            </h3>
-            <div className="space-y-3">
-              {Object.keys(similarityScores).length > 0 ? (
-                Object.entries(similarityScores).map(([key, val]) => (
-                  <div key={key} className="flex justify-between items-center text-sm border-b border-slate-200 pb-2">
-                    <span className="font-mono text-slate-600 uppercase">{key}</span>
-                    <span className="font-bold text-slate-800">{((val as number) * 100).toFixed(1)}%</span>
-                  </div>
-                ))
-              ) : (
-                <div className="text-sm text-slate-500">No similarity breakdown available for this gap.</div>
-              )}
-            </div>
-            {/* Progress Bar */}
-            <div className="mt-5">
-              <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${finalScore}%` }}
-                  transition={{ duration: 1 }}
-                  className="h-full bg-blue-600 rounded-full"
-                />
+          {/* Similarity & Circular Gauge visualizer */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Progress gauge chart */}
+            <div className="bg-[#111712] border border-[#A8FF00]/12 rounded-lg p-5 flex flex-col items-center justify-center text-center">
+              <span className="text-[10px] text-[#97A18D] font-bold uppercase tracking-wider mb-3">Ensemble Match Conf.</span>
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r={radius}
+                    className="stroke-[#0C100D]"
+                    strokeWidth="8"
+                    fill="transparent"
+                  />
+                  <motion.circle
+                    cx="48"
+                    cy="48"
+                    r={radius}
+                    className="stroke-[#A8FF00]"
+                    strokeWidth="8"
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    initial={{ strokeDashoffset: circumference }}
+                    animate={{ strokeDashoffset }}
+                    transition={{ duration: 1.2, ease: "easeOut" }}
+                  />
+                </svg>
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-lg font-bold text-[#F5F7F3]">{finalScore.toFixed(0)}%</span>
+                </div>
               </div>
-              <div className="text-xs text-slate-500 mt-2">
-                Final Ensemble Score: {finalScore.toFixed(1)}%
+            </div>
+
+            {/* Similarity Signal Breakdown details */}
+            <div className="bg-[#111712] border border-[#A8FF00]/12 rounded-lg p-5 md:col-span-2 flex flex-col justify-between">
+              <div>
+                <h3 className="font-bold text-xs uppercase tracking-wider text-[#97A18D] flex items-center gap-2 mb-3">
+                  <FileText className="w-4 h-4 text-[#A8FF00]" /> Semantic Similarity Signal Analysis
+                </h3>
+                <div className="space-y-2.5">
+                  {Object.keys(similarityScores).length > 0 ? (
+                    Object.entries(similarityScores).map(([key, val]) => (
+                      <div key={key} className="flex justify-between items-center text-[10px] border-b border-white/[0.04] pb-1.5 font-mono">
+                        <span className="text-[#97A18D] uppercase tracking-wider">{key}</span>
+                        <span className="font-bold text-[#45D8FF]">{((val as number) * 100).toFixed(1)}%</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs text-[#97A18D] font-sans">No similarity breakdown available for this model inference run.</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-
         </div>
 
         {/* Footer Actions */}
         {(gap.gap_status === 'confirmed' || gap.gap_status === 'suspected') && (
-          <div className="flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
-            <button 
+          <div className="flex flex-wrap gap-3 px-6 py-4 border-t border-[#A8FF00]/12 bg-[#111712]/50">
+            <button
               onClick={() => handleAction('approve')}
               disabled={loading}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              className="flex-1 min-w-[200px] py-2 bg-[#A8FF00] text-[#0C100D] hover:bg-[#CCFF00] hover:shadow-[0_0_15px_rgba(168,255,0,0.4)] rounded text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 active:scale-[0.98]"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Approve & Create MAP
+              Approve &amp; Instructure MAP
             </button>
-            <button 
+            <button
               onClick={() => handleAction('escalate')}
               disabled={loading}
-              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium text-sm hover:bg-slate-100 transition-colors"
+              className="px-5 py-2 border border-[#FFB020]/45 bg-[#FFB020]/5 text-[#FFB020] hover:bg-[#FFB020]/15 hover:shadow-[0_0_12px_rgba(255,176,32,0.15)] rounded text-xs font-bold uppercase tracking-wider transition-all duration-200 active:scale-[0.98]"
             >
-              Send to Triage
+              Triage Escalation
             </button>
-            <button 
+            <button
               onClick={() => handleAction('dismiss')}
               disabled={loading}
-              className="px-4 py-2 border border-slate-300 text-slate-500 rounded-lg font-medium text-sm hover:bg-slate-100 transition-colors"
+              className="px-5 py-2 border border-white/10 bg-white/5 text-[#97A18D] hover:bg-white/10 hover:text-[#F5F7F3] rounded text-xs font-bold uppercase tracking-wider transition-all duration-200 active:scale-[0.98]"
             >
               Dismiss
             </button>
