@@ -97,12 +97,28 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isAuthOrHome =
     location.pathname.startsWith('/auth') || location.pathname === '/' || location.pathname === '/judge-guide';
 
+  const isLoggingOutRef = React.useRef(false);
+
   const handleLogout = () => {
+    // Prevent duplicate invocations (ref guard works even before re-render)
+    if (isLoggingOutRef.current) return;
+    isLoggingOutRef.current = true;
     setIsLoggingOut(true);
-    setTimeout(() => {
-      logout();
-      navigate('/');
-    }, 600);
+
+    try {
+      console.log('[Suraksha] Logging out – clearing session…');
+      logout();                    // clears localStorage + nulls auth context
+      navigate('/auth/login');     // redirect BEFORE component unmounts from auth guard
+      console.log('[Suraksha] Logout successful.');
+    } catch (err) {
+      // Failsafe: even if something throws, reset the UI so the button is usable
+      console.error('[Suraksha] Logout error:', err);
+      setIsLoggingOut(false);
+      isLoggingOutRef.current = false;
+    }
+    // Note: we do NOT reset isLoggingOut to false on success because the component
+    // will be unmounted by the auth guard immediately after navigate(), making any
+    // state update a no-op (and avoiding the React "update on unmounted component" warning).
   };
 
   const pathParts = location.pathname.split('/').filter(Boolean);
