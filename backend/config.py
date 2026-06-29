@@ -99,7 +99,7 @@ DIRECTIVE_KEYWORDS = {
     "shall appoint", "shall participate", "shall ensure"
 }
 
-MATCH_THRESHOLD = 0.60
+MATCH_THRESHOLD = 0.55
 PARTIAL_THRESHOLD = 0.30
 
 SIGNAL_WEIGHTS = {
