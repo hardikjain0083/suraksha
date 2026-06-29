@@ -1,0 +1,38 @@
+{
+    "mode": "holdout",
+    "overall_accuracy": 0.6666666666666666,
+    "metrics_per_class": {
+        "Covered": {
+            "Precision": 1.0,
+            "Recall": 1.0,
+            "F1": 1.0
+        },
+        "Suspected Gap": {
+            "Precision": 0,
+            "Recall": 0.0,
+            "F1": 0
+        },
+        "Confirmed Gap": {
+            "Precision": 0.5,
+            "Recall": 1.0,
+            "F1": 0.6666666666666666
+        }
+    },
+    "confusion_matrix": {
+        "Covered": {
+            "Covered": 2,
+            "Suspected Gap": 0,
+            "Confirmed Gap": 0
+        },
+        "Suspected Gap": {
+            "Covered": 0,
+            "Suspected Gap": 0,
+            "Confirmed Gap": 2
+        },
+        "Confirmed Gap": {
+            "Covered": 0,
+            "Suspected Gap": 0,
+            "Confirmed Gap": 2
+        }
+    }
+}

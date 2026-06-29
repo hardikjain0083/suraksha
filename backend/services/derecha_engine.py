@@ -64,6 +64,7 @@ class SemanticFrame:
     time: Optional[str] = None
     reference: Optional[str] = None
     modality: str = "neutral"
+    negation: bool = False
     raw_text: str = ""
     
     def to_dict(self) -> Dict:
@@ -75,6 +76,7 @@ class SemanticFrame:
             "time": self.time,
             "reference": self.reference,
             "modality": self.modality,
+            "negation": self.negation,
             "raw_text": self.raw_text
         }
 
@@ -300,6 +302,13 @@ class SemanticFrameExtractor:
                 frame.modality = mod
                 break
         
+        # Extract negation
+        negation_patterns = [r"\bnot\b", r"\bnever\b", r"\bprohibit(?:ed|s)?\b", r"\bwithout\b", r"\bnone\b"]
+        for pattern in negation_patterns:
+            if re.search(pattern, lower_text):
+                frame.negation = True
+                break
+        
         # FIX: If no modality found, try to detect from policy language
         if frame.modality == "neutral":
             if "shall" in lower_text or "must" in lower_text:
@@ -375,19 +384,29 @@ class SemanticFrameExtractor:
                 if len(frame.object) > 200:
                     frame.object = frame.object[:200] + "..."
         
-        # Extract constraint
-        for pattern in self.constraint_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                frame.constraint = match.group(1)
-                break
+        # Extract constraint using broader regex
+        constraint_regex = r"\b(\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*(?:hours|days|months|years|lakhs|crores))\b"
+        match = re.search(constraint_regex, text, re.IGNORECASE)
+        if match:
+            frame.constraint = match.group(1)
+        else:
+            for pattern in self.constraint_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    frame.constraint = match.group(1)
+                    break
         
-        # Extract time
-        for pattern in self.time_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                frame.time = match.group(1)
-                break
+        # Extract time using broader regex
+        time_regex = r"\b(quarterly|annually|every year|once a year|immediately|within\s+\d+\s+(?:hours|days|months|years))\b"
+        match = re.search(time_regex, text, re.IGNORECASE)
+        if match:
+            frame.time = match.group(1)
+        else:
+            for pattern in self.time_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    frame.time = match.group(1)
+                    break
         
         # Extract reference
         for pattern in self.reference_patterns:
@@ -432,8 +451,32 @@ class SemanticFrameExtractor:
                     elif a1.lower() in a2.lower() or a2.lower() in a1.lower():
                         found_args += 1
         
+        # Constraint mismatch gating
+        constraint_penalty = False
+        if frame1.constraint and frame2.constraint:
+            if frame1.constraint.lower() != frame2.constraint.lower():
+                constraint_penalty = True
+        
+        if frame1.time and frame2.time:
+            # Simple equivalence check for annual/quarterly (rudimentary logic)
+            t1 = frame1.time.lower()
+            t2 = frame2.time.lower()
+            equivalents = [{"annually", "once a year", "every year"}, {"24 months", "two years"}]
+            match_found = t1 == t2
+            if not match_found:
+                for eq_set in equivalents:
+                    if t1 in eq_set and t2 in eq_set:
+                        match_found = True
+                        break
+            if not match_found:
+                constraint_penalty = True
+
         # Matching degree formula from DERECHA
         matching_degree = (found_args + (1 if predicate_match else 0)) / (total_args + 1)
+        
+        if constraint_penalty:
+            matching_degree *= 0.5 # Gating penalty for hard constraint mismatch
+            
         return matching_degree
     
     def _wu_palmer_match(self, word1: str, word2: str, threshold: float = 0.9) -> bool:
@@ -739,6 +782,14 @@ class GapDetector:
         else:
             signals["frame"] = 0.0
         
+        # Pass negation signal forward for overriding
+        if guideline.semantic_frame and clause.semantic_frame:
+            signals["g_negation"] = 1.0 if guideline.semantic_frame.negation else 0.0
+            signals["c_negation"] = 1.0 if clause.semantic_frame.negation else 0.0
+        else:
+            signals["g_negation"] = 0.0
+            signals["c_negation"] = 0.0
+            
         return signals
     
     def _compute_tfidf_similarity(self, text1: str, text2: str) -> float:
@@ -794,10 +845,29 @@ class GapDetector:
         return max(phrase_score, word_score)
     
     def compute_final_score(self, signals: Dict[str, float]) -> float:
-        """Compute weighted ensemble score from all signals."""
+        """Compute weighted ensemble score from all signals with non-linear override."""
         final_score = 0.0
         for signal_name, weight in self.signal_weights.items():
             final_score += signals.get(signal_name, 0) * weight
+            
+        # Non-Linear Override with Negation Gate
+        emb_score = signals.get("embedding", 0.0)
+        frm_score = signals.get("frame", 0.0)
+        
+        g_negation = signals.get("g_negation", 0.0)
+        c_negation = signals.get("c_negation", 0.0)
+        
+        # Check for explicit negation contradiction
+        negation_mismatch = (g_negation != c_negation)
+        
+        if emb_score >= 0.80: # If local LLM is highly confident it's a semantic paraphrase
+            if negation_mismatch:
+                # Negation Gate: Explicit contradiction detected. Do not override, and penalize.
+                final_score = min(final_score, self.PARTIAL_THRESHOLD - 0.01) # Force it to Confirmed Gap
+            else:
+                # Override weak lexical scores
+                final_score = max(final_score, emb_score)
+                
         return final_score
     
     def detect_gaps(self, guidelines: List[ExtractedGuideline],

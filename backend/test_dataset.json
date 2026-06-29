@@ -1,0 +1,242 @@
+[
+    {
+        "id": "TC01",
+        "category": "Covered",
+        "circular": "Banks must maintain a minimum capital adequacy ratio of 9%.",
+        "policy": "The bank shall maintain a minimum capital adequacy ratio of 9% at all times.",
+        "expected_label": "Covered",
+        "notes": "Exact match in intent and threshold."
+    },
+    {
+        "id": "TC02",
+        "category": "Covered",
+        "circular": "All ATMs must be secured with physical locks and 24/7 CCTV monitoring.",
+        "policy": "Each ATM location is equipped with physical barriers and round-the-clock video surveillance.",
+        "expected_label": "Covered",
+        "notes": "Semantic match using different words."
+    },
+    {
+        "id": "TC03",
+        "category": "Covered",
+        "circular": "The Board shall review the IT security policy at least once a year.",
+        "policy": "The Board of Directors is responsible for conducting an annual review of the IT security framework.",
+        "expected_label": "Covered",
+        "notes": "Time constraint matches ('once a year' vs 'annual')."
+    },
+    {
+        "id": "TC04",
+        "category": "Covered",
+        "circular": "Customer accounts with no transactions for 24 months must be classified as dormant.",
+        "policy": "Accounts exhibiting zero transaction activity for a continuous period of two years will be flagged as dormant.",
+        "expected_label": "Covered",
+        "notes": "24 months = two years."
+    },
+    {
+        "id": "TC05",
+        "category": "Covered",
+        "circular": "Regulated entities must appoint a Chief Information Security Officer (CISO).",
+        "policy": "The organization shall designate a CISO to oversee all information security operations.",
+        "expected_label": "Covered",
+        "notes": "Direct alignment."
+    },
+    {
+        "id": "TC06",
+        "category": "Covered",
+        "circular": "Penetration testing of critical systems must be conducted annually.",
+        "policy": "We perform comprehensive penetration tests on all core and critical systems every year.",
+        "expected_label": "Covered",
+        "notes": "Annually = every year."
+    },
+    {
+        "id": "TC07",
+        "category": "Covered",
+        "circular": "Data at rest must be encrypted using AES-256 or equivalent strong encryption standards.",
+        "policy": "All stored customer and financial data is encrypted employing the AES-256 standard.",
+        "expected_label": "Covered",
+        "notes": "Specific standard match."
+    },
+    {
+        "id": "TC08",
+        "category": "Covered",
+        "circular": "Banks must provide an option for customers to instantly block their debit cards via mobile app.",
+        "policy": "The mobile banking application includes a feature enabling users to immediately freeze or block their debit cards.",
+        "expected_label": "Covered",
+        "notes": "Semantic similarity."
+    },
+    {
+        "id": "TC09",
+        "category": "Covered",
+        "circular": "A grievance redressal report must be submitted to the RBI within 15 days of the quarter-end.",
+        "policy": "The compliance team shall file the quarterly grievance redressal report with the RBI no later than 15 days after the end of each quarter.",
+        "expected_label": "Covered",
+        "notes": "Constraint and actor match."
+    },
+    {
+        "id": "TC10",
+        "category": "Covered",
+        "circular": "Multi-factor authentication (MFA) is mandatory for all internal employee access to core banking systems.",
+        "policy": "All staff must authenticate using MFA before accessing the core banking application.",
+        "expected_label": "Covered",
+        "notes": "Clear match."
+    },
+    {
+        "id": "TC11",
+        "category": "Suspected Gap",
+        "circular": "Banks shall implement multi-factor authentication for all customer logins.",
+        "policy": "The bank may consider implementing multi-factor authentication for customer logins if deemed necessary.",
+        "expected_label": "Suspected Gap",
+        "notes": "Modality mismatch (shall/must vs may/consider). Present but weaker."
+    },
+    {
+        "id": "TC12",
+        "category": "Suspected Gap",
+        "circular": "The Board of Directors must review the risk policy quarterly.",
+        "policy": "The risk management committee will review the risk policy annually.",
+        "expected_label": "Suspected Gap",
+        "notes": "Mismatch in time constraint (quarterly vs annually). Coverage exists but is weaker."
+    },
+    {
+        "id": "TC13",
+        "category": "Confirmed Gap",
+        "circular": "All critical incidents must be reported to CERT-In within 6 hours of identification.",
+        "policy": "The IT team should report any severe cyber incidents to relevant authorities within 24 hours.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Missing crucial 6-hour constraint. A 24h reporting window is entirely out of compliance with the 6h hard mandate."
+    },
+    {
+        "id": "TC14",
+        "category": "Confirmed Gap",
+        "circular": "Customer consent is explicitly required before sharing data with third-party vendors.",
+        "policy": "The bank shares data with trusted third-party vendors to improve services, subject to our general terms.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Missing explicit consent mechanism component entirely."
+    },
+    {
+        "id": "TC15",
+        "category": "Suspected Gap",
+        "circular": "Banks must hold a capital conservation buffer of 2.5%.",
+        "policy": "The bank aims to maintain a capital buffer of at least 1.5% to weather economic downturns.",
+        "expected_label": "Suspected Gap",
+        "notes": "Threshold mismatch (2.5% vs 1.5%). Buffer exists, but insufficient."
+    },
+    {
+        "id": "TC16",
+        "category": "Confirmed Gap",
+        "circular": "All employees must undergo anti-money laundering (AML) training annually.",
+        "policy": "New hires will receive AML orientation during their onboarding process.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Missing two distinct components: annual cadence and all-employees scope."
+    },
+    {
+        "id": "TC17",
+        "category": "Suspected Gap",
+        "circular": "Data backups must be stored in a geographically distinct disaster recovery site.",
+        "policy": "Daily data backups are encrypted and stored in an off-site cloud storage bucket.",
+        "expected_label": "Suspected Gap",
+        "notes": "Ambiguous if 'off-site cloud' meets 'geographically distinct DR site'. Partial coverage present."
+    },
+    {
+        "id": "TC18",
+        "category": "Suspected Gap",
+        "circular": "Banks must strictly limit exposure to a single borrower to 15% of capital funds.",
+        "policy": "We generally restrict lending to a single corporate entity to around 20% of capital funds.",
+        "expected_label": "Suspected Gap",
+        "notes": "Constraint mismatch (15% vs 20%) and weaker modality ('generally restrict'). Present but insufficient."
+    },
+    {
+        "id": "TC19",
+        "category": "Suspected Gap",
+        "circular": "ATMs must be upgraded to support EMV chip and PIN processing immediately.",
+        "policy": "The ATM fleet is undergoing a phased upgrade to support EMV chips over the next 18 months.",
+        "expected_label": "Suspected Gap",
+        "notes": "Time constraint mismatch (immediately vs 18 months). Upgrade in progress but insufficient timing."
+    },
+    {
+        "id": "TC20",
+        "category": "Suspected Gap",
+        "circular": "Suspicious Transaction Reports (STRs) must be filed within 7 days of arriving at a conclusion.",
+        "policy": "The compliance officer will file STRs with the regulator promptly upon concluding an investigation.",
+        "expected_label": "Suspected Gap",
+        "notes": "Ambiguous time constraint ('promptly' vs 'within 7 days'). Present but lacks precision."
+    },
+    {
+        "id": "TC21",
+        "category": "Confirmed Gap",
+        "circular": "Banks must establish a dedicated whistle-blower mechanism for reporting fraud.",
+        "policy": "Employees are encouraged to report any HR grievances to their direct managers.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Completely missing whistle-blower/fraud mechanism."
+    },
+    {
+        "id": "TC22",
+        "category": "Confirmed Gap",
+        "circular": "Regulated entities must conduct an independent audit of their IT systems every year.",
+        "policy": "The marketing team will review vendor contracts annually.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Unrelated domains (IT audit vs Marketing vendors)."
+    },
+    {
+        "id": "TC23",
+        "category": "Confirmed Gap",
+        "circular": "The bank shall not levy any penal charges for non-maintenance of minimum balance in basic savings bank deposit accounts.",
+        "policy": "A fee of INR 500 will be deducted monthly if the account balance falls below the minimum required amount.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Direct contradiction."
+    },
+    {
+        "id": "TC24",
+        "category": "Confirmed Gap",
+        "circular": "Banks must implement API security gateways for all open banking interfaces.",
+        "policy": "The bank shall ensure physical security of all branch premises.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Similar generic words ('security', 'bank') but entirely missing API/Open Banking clause."
+    },
+    {
+        "id": "TC25",
+        "category": "Confirmed Gap",
+        "circular": "Foreign currency non-resident (FCNR) deposits must have a minimum maturity of 1 year.",
+        "policy": "Domestic fixed deposits can be opened for a minimum duration of 7 days.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Different subjects (FCNR vs Domestic)."
+    },
+    {
+        "id": "TC26",
+        "category": "Confirmed Gap",
+        "circular": "Positive Pay System must be implemented for all cheques of value ₹50,000 and above.",
+        "policy": "Cheque books will be issued to current account holders free of charge.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Topic is cheques, but entirely missing Positive Pay requirement."
+    },
+    {
+        "id": "TC27",
+        "category": "Confirmed Gap",
+        "circular": "Card issuers must provide a one-time password (OTP) for all online domestic transactions.",
+        "policy": "Credit cards will be dispatched to the customer's registered address within 3 working days.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Topic is cards, but missing OTP requirement."
+    },
+    {
+        "id": "TC28",
+        "category": "Confirmed Gap",
+        "circular": "Banks must strictly prohibit the use of corporate funds for speculative cryptocurrency trading.",
+        "policy": "The investment committee will allocate surplus funds into government bonds and AAA-rated corporate debt.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Missing explicit prohibition on crypto."
+    },
+    {
+        "id": "TC29",
+        "category": "Confirmed Gap",
+        "circular": "Senior management compensation must include a malus/clawback clause for poor financial performance.",
+        "policy": "Employees will receive an annual bonus based on their individual performance ratings.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Missing clawback/malus for senior management."
+    },
+    {
+        "id": "TC30",
+        "category": "Confirmed Gap",
+        "circular": "Branches must display the comprehensive notice board including ombudsman details at a prominent location.",
+        "policy": "Branch managers are responsible for ensuring sufficient cash inventory in the vault.",
+        "expected_label": "Confirmed Gap",
+        "notes": "Unrelated operational branch directive."
+    }
+]
