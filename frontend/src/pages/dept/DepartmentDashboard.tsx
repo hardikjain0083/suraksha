@@ -431,7 +431,7 @@ export function DepartmentDashboard() {
                                   Edit
                                 </button>
                                 <button
-                                  onClick={() => setReassigningGapId(gap.gap_id)}
+                                  onClick={(e) => { e.stopPropagation(); setReassigningGapId(gap.gap_id); }}
                                   className="px-2 py-1 bg-cyber-blue/10 hover:bg-cyber-blue text-cyber-blue hover:text-white border border-cyber-blue/35 rounded text-[10px] font-bold transition-all"
                                 >
                                   Reassign
@@ -447,7 +447,10 @@ export function DepartmentDashboard() {
                             )}
                           </div>
                           {reassigningGapId === gap.gap_id && (
-                            <div className="mt-2 flex gap-1 justify-end items-center">
+                            <div
+                              className="mt-2 flex gap-1 justify-end items-center"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <select
                                 value={selectedEmpId}
                                 onChange={(e) => setSelectedEmpId(e.target.value)}
@@ -459,7 +462,7 @@ export function DepartmentDashboard() {
                                 ))}
                               </select>
                               <button 
-                                onClick={() => handleReassign(gap.gap_id)}
+                                onClick={(e) => { e.stopPropagation(); handleReassign(gap.gap_id); }}
                                 className="p-1 bg-cyber-cyan text-obsidian-950 rounded hover:scale-105 transition-transform"
                               >
                                 <Check className="w-3.5 h-3.5" />

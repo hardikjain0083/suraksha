@@ -1020,7 +1020,10 @@ export function AdminDashboard() {
                             )}
                           </div>
                           {reassigningGapId === gap.gap_id && (
-                            <div className="mt-2 flex gap-2 justify-end items-center">
+                            <div
+                              className="mt-2 flex gap-2 justify-end items-center"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <select
                                 value={selectedNewEmpId}
                                 onChange={(e) => setSelectedNewEmpId(e.target.value)}

@@ -385,6 +385,10 @@ export const LoginPage = () => {
           box-sizing: border-box;
         }
 
+        .lp-input[type="password"] {
+          padding-right: 80px;
+        }
+
         .lp-input::placeholder {
           color: #94A3B8;
         }
