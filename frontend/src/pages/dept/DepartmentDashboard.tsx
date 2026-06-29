@@ -125,9 +125,7 @@ export function DepartmentDashboard() {
     if (!selectedEmpId) return;
     setActionLoading(gapId);
     try {
-      const formData = new FormData();
-      formData.append('new_employee_id', selectedEmpId);
-      await apiClient.patch(`/api/gaps/${gapId}/reassign`, formData);
+      await apiClient.patch(`/api/gaps/${gapId}/reassign`, { new_employee_id: selectedEmpId });
       triggerToast(`Task successfully reassigned to ${selectedEmpId}.`);
       setReassigningGapId(null);
       setSelectedEmpId('');
